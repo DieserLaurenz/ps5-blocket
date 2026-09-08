@@ -10,7 +10,7 @@ Use `/newbot` with BotFather if you do not have a bot yet. BotFather manages bot
 
 ## Behaviour
 
-- Schedule: `2-59/5 * * * *` — minutes 2, 7, 12, etc., around the clock. Check the Actions history for automatic `schedule` events; successful manual runs alone do not verify the scheduler.
+- Schedule: `3,8,13,18,23,28,33,38,43,48,53,58 * * * *` — minutes 3, 8, 13, etc., around the clock. Check the Actions history for automatic `schedule` events; successful manual runs alone do not verify the scheduler.
 - Each run searches both terms across all categories up to 4,000 SEK. Shipping within Sweden or pickup in Göteborg; settings are in `config.json`.
 - The first run sends one message per matching console. Later runs alert on new listings or prices below the lowest previously alerted price. A price going up and back down does not trigger a duplicate.
 - A daily status message confirms a successful search. If it stops arriving, check the Actions page.
