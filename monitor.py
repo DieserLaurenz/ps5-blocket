@@ -32,15 +32,15 @@ def request_json(url, *, data=None, headers=None, method=None):
             return json.load(response)
     except urllib.error.HTTPError as exc:
         # Telegram URLs contain tokens. Never print raw exceptions or request URLs.
-        raise ServiceError(f'API-Aufruf fehlgeschlagen (HTTP {exc.code}).') from None
+        raise ServiceError(f'API request failed (HTTP {exc.code}).') from None
     except (urllib.error.URLError, TimeoutError, OSError, ValueError):
-        raise ServiceError('API-Verbindung oder JSON-Antwort fehlgeschlagen.') from None
+        raise ServiceError('API connection or JSON response failed.') from None
 
 
 class Telegram:
     def __init__(self, token, chat_id):
         if not token or not chat_id:
-            raise ServiceError('TELEGRAM_BOT_TOKEN und TELEGRAM_CHAT_ID fehlen. Setup-Telegram.cmd ausführen.')
+            raise ServiceError('TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are missing. Run Setup-Telegram.cmd.')
         self.token, self.chat_id = token, str(chat_id)
 
     @property
@@ -54,7 +54,7 @@ class Telegram:
             **({'parse_mode': 'HTML'} if html else {}),
         })
         if result.get('ok') is not True:
-            raise ServiceError('Telegram hat die Nachricht nicht bestätigt.')
+            raise ServiceError('Telegram did not confirm the message.')
 
 
 class LocalStore:
@@ -73,7 +73,7 @@ class GitHubStore:
     """Persist only notification IDs/prices on a dedicated branch, never credentials."""
     def __init__(self, repo, token):
         if not repo or not token:
-            raise ServiceError('GITHUB_REPOSITORY oder GITHUB_TOKEN fehlt.')
+            raise ServiceError('GITHUB_REPOSITORY or GITHUB_TOKEN is missing.')
         self.base = f'https://api.github.com/repos/{repo}'
         self.headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json',
                         'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'PS5-Blocket-Monitor'}
@@ -91,7 +91,7 @@ class GitHubStore:
 
     def save(self, state):
         if not self.sha:
-            raise ServiceError('Statusdatei wurde nicht geladen.')
+            raise ServiceError('State file has not been loaded.')
         document = json.dumps(state, indent=2)
         if document == self.document:
             return
@@ -105,40 +105,40 @@ class GitHubStore:
 
 def prepare_state(state, recipient):
     if state and state.get('version') != 1:
-        raise ServiceError('Unbekanntes Statusformat; keine Benachrichtigungen gesendet.')
+        raise ServiceError('Unknown state format; no notifications sent.')
     if not state or state.get('recipient') != recipient:
         return {'version': 1, 'recipient': recipient, 'notified': {}}
     if not isinstance(state.get('notified'), dict):
-        raise ServiceError('Beschädigte Benachrichtigungshistorie.')
+        raise ServiceError('Corrupted notification history.')
     return state
 
 
 def message_for(row, old_price=None, assessment_update=False, preview=False):
     """Trusted HTML layout; seller/model text is always bounded then escaped."""
-    label = ('👀 Formatvorschau · aktuelles Angebot' if preview else
-             '🧠 PS5 · Bewertung aktualisiert' if assessment_update else
-             '🎮 Neue passende PS5' if old_price is None else f'📉 PS5 günstiger: −{old_price - row["price"]:g} SEK')
+    label = ('👀 Format preview · current listing' if preview else
+             '🧠 PS5 · Assessment updated' if assessment_update else
+             '🎮 New PS5 match' if old_price is None else f'📉 PS5 price drop: −{old_price - row["price"]:g} SEK')
     analysis = row.get('analysis') or {}
     inferred_generation, inferred_edition = evaluator.variant(row['title'])
     generation = analysis.get('generation', inferred_generation)
     edition = analysis.get('edition', inferred_edition)
-    model = {'original': 'PS5 Original', 'slim': 'PS5 Slim', 'pro': 'PS5 Pro'}.get(generation, 'PS5 · Version unklar')
-    model += ' · ' + {'disc': 'Disc', 'digital': 'Digital'}.get(edition, 'Edition unklar')
-    condition = {'new': 'Neu laut Anzeige', 'used': 'Gebraucht laut Anzeige',
-                 'faulty': 'Defekt laut Anzeige'}.get(analysis.get('condition'), 'Zustand unklar')
-    delivery = '🚚 <b>Versand möglich</b>' if row['shipping'] else '🤝 <b>Abholung in Göteborg</b>'
+    model = {'original': 'PS5 Original', 'slim': 'PS5 Slim', 'pro': 'PS5 Pro'}.get(generation, 'PS5 · Version unknown')
+    model += ' · ' + {'disc': 'Disc', 'digital': 'Digital'}.get(edition, 'Edition unknown')
+    condition = {'new': 'New according to seller', 'used': 'Used according to seller',
+                 'faulty': 'Faulty according to seller'}.get(analysis.get('condition'), 'Condition unknown')
+    delivery = '🚚 <b>Shipping available</b>' if row['shipping'] else '🤝 <b>Pickup in Göteborg</b>'
     # Construct the link from the listing ID, not seller/LLM-provided markup or URLs.
     identifier = str(row['id'])
     if not identifier.isascii() or not identifier.isdecimal():
-        raise ValueError('Ungültige Blocket-Anzeigen-ID')
-    price = f'{row["price"]:,g}'.replace(',', '_').replace('.', ',').replace('_', '.')
+        raise ValueError('Invalid Blocket listing ID')
+    price = f'{row["price"]:,g}'
     return (f'<b>{label}</b>\n\n<b>{escape(row["title"][:300])}</b>\n'
             f'💰 <b>{price} SEK</b>\n'
             f'🕹 {model}\n🔎 {condition}\n'
             f'📍 {escape(row["location"][:100])}\n{delivery}\n'
-            '<i>Ggf. zzgl. Versand und Käuferschutz.</i>'
+            '<i>Shipping and buyer protection may cost extra.</i>'
             + evaluator.assessment_text(row)
-            + f'\n\n🔗 <a href="https://www.blocket.se/recommerce/forsale/item/{identifier}">Anzeige auf Blocket öffnen</a>')
+            + f'\n\n🔗 <a href="https://www.blocket.se/recommerce/forsale/item/{identifier}">View listing on Blocket</a>')
 
 
 def notify_rows(rows, state, store, telegram, now):
@@ -184,12 +184,12 @@ def execute(config, store, telegram, dry_run=False, preview_format=False):
         # A daily health message confirms continued operation even without any deals.
         day = now[:10]
         if state.get('last_health_day') != day:
-            qualifier = 'Suche unvollständig: Seitenlimit erreicht.' if warnings else 'Suche abgeschlossen.'
-            telegram.send(f'✅ <b>PS5-Suche aktiv</b>\n\n'
-                          f'🎮 <b>{len(rows)} passende Angebote</b> bis {config["max_price"]:g} SEK\n'
-                          f'{qualifier}\n\n⏱ Zeitplan: alle 5 Minuten (Verzögerungen durch GitHub möglich).\n'
-                          '🚚 Versand in Schweden · 🤝 Abholung Göteborg\n'
-                          '<i>Nächste Statusmeldung morgen.</i>', html=True)
+            qualifier = 'Search incomplete: page limit reached.' if warnings else 'Search completed.'
+            telegram.send(f'✅ <b>PS5 search active</b>\n\n'
+                          f'🎮 <b>{len(rows)} matching listings</b> up to {config["max_price"]:g} SEK\n'
+                          f'{qualifier}\n\n⏱ Scheduled every 5 minutes (GitHub delays are possible).\n'
+                          '🚚 Shipping within Sweden · 🤝 Pickup in Göteborg\n'
+                          '<i>Next status update tomorrow.</i>', html=True)
             state['last_health_day'] = day
             state['last_health_at'] = now
             store.save(state)
@@ -198,13 +198,13 @@ def execute(config, store, telegram, dry_run=False, preview_format=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Ein Suchlauf mit Telegram; für Cron und GitHub Actions.')
-    parser.add_argument('--dry-run', action='store_true', help='Live suchen ohne Nachrichten oder Statusänderung')
+    parser = argparse.ArgumentParser(description='One search with Telegram alerts; for cron and GitHub Actions.')
+    parser.add_argument('--dry-run', action='store_true', help='Live search without messages or state changes')
     parser.add_argument('--config', type=Path, default=scraper.ROOT / 'config.json')
     parser.add_argument('--state', type=Path, default=scraper.ROOT / 'output' / 'notifications.json')
     parser.add_argument('--test-telegram', action='store_true')
-    parser.add_argument('--preview-format', action='store_true', help='Ein aktuelles Angebot als Telegram-Formatvorschau senden')
-    parser.add_argument('--diagnose-ai', action='store_true', help='Verfügbare Gemini-Modelle auflisten, ohne Generierung')
+    parser.add_argument('--preview-format', action='store_true', help='Send one current listing as a Telegram format preview')
+    parser.add_argument('--diagnose-ai', action='store_true', help='List available Gemini models without generating content')
     args = parser.parse_args()
     try:
         if args.diagnose_ai:
@@ -214,9 +214,9 @@ def main():
         telegram = None if args.dry_run else Telegram(os.environ.get('TELEGRAM_BOT_TOKEN'), os.environ.get('TELEGRAM_CHAT_ID'))
         if args.test_telegram:
             if telegram is None:
-                raise ServiceError('--dry-run und --test-telegram sind nicht kombinierbar.')
-            telegram.send('Test erfolgreich: Dein PS5-Suchdienst kann dir Telegram-Nachrichten senden.')
-            print('Telegram-Testnachricht bestätigt.')
+                raise ServiceError('--dry-run and --test-telegram cannot be combined.')
+            telegram.send('Test successful: your PS5 monitor can send you Telegram messages.')
+            print('Telegram test message confirmed.')
             return 0
         store = (GitHubStore(os.environ.get('GITHUB_REPOSITORY'), os.environ.get('GITHUB_TOKEN'))
                  if os.environ.get('GITHUB_ACTIONS') == 'true' and not args.dry_run else LocalStore(args.state))
@@ -224,7 +224,7 @@ def main():
         return 0
     except (ServiceError, scraper.ScrapeError, evaluator.AIError, ValueError, OSError, KeyError, TypeError) as exc:
         # ServiceError and ScrapeError are sanitized; other failures contain local data only.
-        print(f'Monitor fehlgeschlagen: {exc}', file=sys.stderr)
+        print(f'Monitor failed: {exc}', file=sys.stderr)
         return 1
 
 

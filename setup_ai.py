@@ -10,11 +10,11 @@ REPO = 'DieserLaurenz/ps5-blocket'
 
 
 def main():
-    print('Erstelle einen API-Key unter https://aistudio.google.com/api-keys')
-    print('Für kostenlosen Betrieb: ein Free-Tier-Projekt OHNE aktivierte Abrechnung verwenden.')
-    print('Das Programm aktiviert keine Abrechnung. Bei ausgeschöpftem Kontingent läuft die Suche ohne KI weiter.')
+    print('Create an API key at https://aistudio.google.com/api-keys')
+    print('For free operation: use a free-tier project WITHOUT billing enabled.')
+    print('This program does not enable billing. If quota runs out, the search continues without AI.')
     try:
-        key = getpass.getpass('Gemini API-Key (unsichtbare Eingabe): ').strip()
+        key = getpass.getpass('Gemini API key (hidden input): ').strip()
         request = urllib.request.Request(
             'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL,
             headers={'x-goog-api-key': key})
@@ -24,13 +24,13 @@ def main():
                                 input=key, capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError('secret setup failed')
-        print('API-Key geprüft und als GitHub-Secret gespeichert. Du kannst dieses Fenster schließen.')
+        print('API key verified and saved as a GitHub secret. You can close this window.')
         return 0
     except KeyboardInterrupt:
-        print('\nAbgebrochen.')
+        print('\nCancelled.')
     except Exception:
         # No raw API response or exception: these can contain credentials.
-        print('Einrichtung fehlgeschlagen. Key, API-Zugriff und gh auth status prüfen.', file=sys.stderr)
+        print('Setup failed. Check your key, API access and gh auth status.', file=sys.stderr)
     return 1
 
 

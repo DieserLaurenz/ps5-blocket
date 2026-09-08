@@ -106,7 +106,7 @@ class ScraperTests(unittest.TestCase):
         rows, _ = s.select([doc(flags=[])], CONFIG, FakeClient([page]))
         self.assertEqual(len(rows), 1)
         self.assertTrue(rows[0]['shipping'])
-        self.assertIn('Beschreibung', rows[0]['shipping_source'])
+        self.assertIn('description', rows[0]['shipping_source'])
 
     def test_history_price_drop(self):
         row = s.listing(doc(), CONFIG)[0]

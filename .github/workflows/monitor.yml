@@ -1,4 +1,4 @@
-name: PS5 Suche
+name: PS5 Search
 
 on:
   schedule:
@@ -6,15 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Live suchen ohne Telegram-Nachrichten'
+        description: 'Live search without Telegram messages'
         type: boolean
         default: false
       diagnose_ai:
-        description: 'Nur verfügbare Gemini-Modelle prüfen (keine Generierung)'
+        description: 'Check available Gemini models only (no generation)'
         type: boolean
         default: false
       preview_format:
-        description: 'Ein aktuelles Angebot als Telegram-Formatvorschau senden'
+        description: 'Send one current listing as a Telegram format preview'
         type: boolean
         default: false
 

@@ -109,9 +109,9 @@ class MonitorTests(unittest.TestCase):
             m.notify_rows([row()], self.state, self.store, m.Telegram('123:test', '456'), 'now')
         payload = request.call_args.kwargs['data']
         self.assertEqual(payload['parse_mode'], 'HTML')
-        self.assertIn('<b>3.000 SEK</b>', payload['text'])
+        self.assertIn('<b>3,000 SEK</b>', payload['text'])
         self.assertIn('Edition', m.message_for({**row(), 'title': 'PS5'}))
-        self.assertIn('Abholung in Göteborg', payload['text'])
+        self.assertIn('Pickup in Göteborg', payload['text'])
 
     def test_seller_and_ai_text_cannot_inject_html(self):
         from test_evaluator import analysis
@@ -131,7 +131,7 @@ class MonitorTests(unittest.TestCase):
         from test_evaluator import analysis
         item = row()
         item.update(title='🎮&' * 300, location='🎮&' * 100, analysis=analysis(),
-                    price_comparison={'label': 'Preisvergleich offen: genaue PS5-Version fehlt'})
+                    price_comparison={'label': 'Price comparison pending: exact PS5 version unknown'})
         item['analysis']['summary'] = '🎮&' * 180
         for field in ('included', 'positives', 'warnings', 'questions'):
             item['analysis'][field] = ['🎮&' * 120] * 3
@@ -162,7 +162,7 @@ class MonitorTests(unittest.TestCase):
             result = m.execute(config, self.store, self.telegram, preview_format=True)
         self.assertEqual(self.state, before)
         self.assertEqual(result['sent'], 1)
-        self.assertIn('Formatvorschau', self.telegram.messages[-1])
+        self.assertIn('Format preview', self.telegram.messages[-1])
 
 
 if __name__ == '__main__':

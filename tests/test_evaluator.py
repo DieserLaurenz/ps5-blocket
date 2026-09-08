@@ -19,9 +19,9 @@ def row(identifier='123', price=3000):
 
 
 def analysis():
-    return {'generation': 'slim', 'edition': 'disc', 'condition': 'used', 'summary': 'Laut Anzeige funktionsfähig.',
-            'included': ['Zwei Controller'], 'positives': [], 'warnings': ['Rechnung nicht erwähnt'],
-            'questions': ['Ist die Rechnung vorhanden?'], 'confidence': 'medium'}
+    return {'generation': 'slim', 'edition': 'disc', 'condition': 'used', 'summary': 'Working according to seller.',
+            'included': ['Two controllers'], 'positives': [], 'warnings': ['Receipt not mentioned'],
+            'questions': ['Is the receipt available?'], 'confidence': 'medium'}
 
 
 class EvaluatorTests(unittest.TestCase):
@@ -50,6 +50,19 @@ class EvaluatorTests(unittest.TestCase):
             changed['description'] += ' Kvitto finns.'
             self.enrich([changed])
         self.assertEqual(generate.call_count, 2)
+
+    def test_old_language_cache_is_replaced_with_english_assessment(self):
+        item = row()
+        with patch('evaluator.PROMPT_VERSION', 2):
+            old_digest = e.fingerprint(item)
+        self.state['ai_cache'] = {item['id']: {'fingerprint': old_digest,
+                                              'analysis': {**analysis(), 'summary': 'Alte deutsche Bewertung'}}}
+        with patch('evaluator.generate', return_value=analysis()) as generate:
+            self.enrich([item])
+        generate.assert_called_once()
+        self.assertEqual(item['analysis']['summary'], 'Working according to seller.')
+        self.assertNotEqual(item['assessment_id'], old_digest)
+        self.assertIn('respond in English', e.SYSTEM)
 
     def test_budget_and_no_dropped_rows(self):
         rows = [row(str(i)) for i in range(8)]
@@ -125,9 +138,9 @@ class EvaluatorTests(unittest.TestCase):
         self.assertNotIn('median', e.compare_price(row(), market, NOW))
         generic = row()
         generic['title'] = 'PS5'
-        self.assertIn('Version', e.compare_price(generic, market, NOW)['label'])
+        self.assertIn('version', e.compare_price(generic, market, NOW)['label'])
         self.assertNotIn('median', e.compare_price(row(), market, NOW + 86401))
-        self.assertIn('unvollständig', e.compare_price(row(), {**market, 'truncated': True}, NOW)['label'])
+        self.assertIn('incomplete', e.compare_price(row(), {**market, 'truncated': True}, NOW)['label'])
 
     def test_reference_failure_retains_previous_sample(self):
         state = {'market': {'attempted_at': NOW - 100000, 'fetched_at': NOW - 1000, 'samples': []}}
@@ -153,8 +166,8 @@ class EvaluatorTests(unittest.TestCase):
             self.assertEqual(m.notify_rows([enriched], state, store, telegram, 'now'), 1)
             self.assertEqual(m.notify_rows([enriched], state, store, telegram, 'now'), 0)
         self.assertEqual(state['notified']['123']['price'], 2500)
-        self.assertIn('Bewertung aktualisiert', telegram.messages[0])
-        self.assertNotIn('günstiger', telegram.messages[0])
+        self.assertIn('Assessment updated', telegram.messages[0])
+        self.assertNotIn('price drop', telegram.messages[0])
 
     def test_unchanged_github_state_does_not_create_commit(self):
         store = m.GitHubStore('owner/repo', 'test')

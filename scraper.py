@@ -68,8 +68,8 @@ def parse_search(source):
                 if isinstance(value, dict) and isinstance(value.get('docs'), list) and 'metadata' in value:
                     return value['docs'], value['metadata']
         except (ValueError, TypeError) as exc:
-            raise ScrapeError('Blocket-Suchdaten sind nicht lesbar.') from exc
-    raise ScrapeError('Keine Suchdaten gefunden: Seitenformat geändert oder Zugriff blockiert. Kein leeres Ergebnis gespeichert.')
+            raise ScrapeError('Cannot read Blocket search data.') from exc
+    raise ScrapeError('No search data found: page format changed or access blocked. No empty result was saved.')
 
 
 def walk_json(value):
@@ -99,7 +99,7 @@ def parse_detail(source):
                     'description': html.unescape(re.sub('<[^>]+>', ' ', obj.get('description', ''))),
                     'availability': offer.get('availability', ''),
                 }
-    raise ScrapeError('Anzeigenbeschreibung nicht gefunden')
+    raise ScrapeError('Listing description not found')
 
 
 def normalized(value):
@@ -125,13 +125,13 @@ def title_reason(title):
     text = normalized(title)
     model = PS5.search(text)
     if not model:
-        return 'Keine PS5 im Titel'
+        return 'No PS5 in title'
     if TRADE.search(text):
-        return 'Tausch, Gesuch oder Vermietung'
+        return 'Trade, wanted ad or rental'
     if FAULT.search(text):
-        return 'Defekt oder Reparatur im Titel'
+        return 'Fault or repair mentioned in title'
     if re.search(r'\b(?:ps\s*[1-4]|playstation\s*[1-4])\b', text):
-        return 'Mehrere PlayStation-Generationen im Titel; Konsole nicht eindeutig'
+        return 'Multiple PlayStation generations in title; console unclear'
     accessories = list(ACCESSORY.finditer(text))
     if accessories:
         first = accessories[0]
@@ -139,7 +139,7 @@ def title_reason(title):
         console_before = model.end() <= first.start()
         bridge = text[model.end():first.start()] if console_before else ''
         if not console_before or not BUNDLE.search(bridge) or re.search(r'\bps\s*[1-4]\b', bridge):
-            return 'Zubehör oder Spiel im Titel'
+            return 'Accessory or game in title'
         return ''
     # Positive console evidence prevents unknown game names from passing a blacklist.
     if re.search(r'\b(?:spelkonsol|konsol|console)\b', text):
@@ -152,7 +152,7 @@ def title_reason(title):
     if re.fullmatch(r'(?:(?:sony|saljer|saljes|ny|nytt|ooppnad|obruten|vit|svart|nyskick|fint|skick|'
                     r'bra|billig|billigt|prissankt|pris|sankt|original|edition|standard|fat)\s*)*', remaining):
         return ''
-    return 'Keine eindeutige Konsolenbezeichnung (möglicherweise Spiel oder Zubehör)'
+    return 'No clear console designation (possibly a game or accessory)'
 
 
 def fault_in_description(text):
@@ -176,19 +176,19 @@ def listing(doc, config, require_delivery=True):
     price = doc.get('price') or {}
     amount = price.get('amount')
     if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
-        reason = reason or 'Kein positiver Festpreis'
+        reason = reason or 'No positive fixed price'
     elif price.get('currency_code') != 'SEK' or amount > config['max_price']:
-        reason = reason or 'Außerhalb der Preisgrenze oder andere Währung'
+        reason = reason or 'Outside price limit or different currency'
     if doc.get('trade_type') not in (None, 'Säljes'):
-        reason = reason or 'Kein Verkaufsangebot'
+        reason = reason or 'Not a sale listing'
     shipping, pickup = delivery(doc, config['pickup_cities'])
     if require_delivery and not shipping and not pickup:
-        reason = reason or 'Kein ausgewiesener Versand und keine Abholung in Göteborg'
+        reason = reason or 'No listed shipping and no pickup in Göteborg'
     if reason:
         return None, reason
     identifier = str(doc.get('id', ''))
     if not identifier.isdigit():
-        return None, 'Ungültige Anzeigen-ID'
+        return None, 'Invalid listing ID'
     title = doc['heading']
     model = 'Pro' if re.search(r'\bpro\b', title, re.I) else 'Slim' if re.search(r'\bslim\b', title, re.I) else 'PS5'
     model += ' Digital' if 'digital' in title.casefold() else ' Disc' if re.search(r'\b(disc|disk|skiva)\b', title, re.I) else ''
@@ -196,7 +196,7 @@ def listing(doc, config, require_delivery=True):
         'id': identifier, 'title': title, 'price': amount, 'currency': 'SEK',
         'location': str(doc.get('location', '')), 'shipping': shipping, 'pickup': pickup,
         'free_shipping': shipping and 'seller_pays_shipping' in doc.get('flags', []),
-        'shipping_source': 'Blocket-Versandmarkierung' if shipping else '',
+        'shipping_source': 'Blocket shipping flag' if shipping else '',
         'url': f'https://www.blocket.se/recommerce/forsale/item/{identifier}',
         'image': (doc.get('image') or {}).get('url', ''), 'model': model,
         'description': '', 'detail_checked': False, 'notes': [],
@@ -219,9 +219,9 @@ class Client:
             with urllib.request.urlopen(request, timeout=30) as response:
                 return response.read().decode('utf-8')
         except urllib.error.HTTPError as exc:
-            raise ScrapeError(f'Blocket HTTP {exc.code}; Abruf abgebrochen (keine automatischen Wiederholungen).') from exc
+            raise ScrapeError(f'Blocket HTTP {exc.code}; request stopped (no automatic retries).') from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise ScrapeError(f'Netzwerkfehler: {exc}') from exc
+            raise ScrapeError(f'Network error: {exc}') from exc
 
 
 def search_url(config, query, page):
@@ -239,15 +239,15 @@ def collect(config, client):
         previous_ids = set()
         for page in range(1, config['max_pages'] + 1):
             url = search_url(config, query, page)
-            print(f'Suche {query!r}, Seite {page} ...', flush=True)
+            print(f'Searching {query!r}, page {page} ...', flush=True)
             batch, metadata = parse_search(client.get(url))
             paging = metadata.get('paging', {})
             if int(paging.get('current', page)) != page:
-                raise ScrapeError('Blocket liefert eine unerwartete Ergebnisseite.')
+                raise ScrapeError('Blocket returned an unexpected results page.')
             searches.append(url)
             ids = {str(d.get('id')) for d in batch}
             if ids and ids <= previous_ids:
-                raise ScrapeError('Blocket wiederholt dieselbe Seite; Ergebnis wäre unvollständig.')
+                raise ScrapeError('Blocket repeated the same page; results would be incomplete.')
             previous_ids.update(ids)
             for doc in batch:
                 docs[str(doc.get('id'))] = doc
@@ -255,7 +255,7 @@ def collect(config, client):
             if not batch or metadata.get('is_end_of_paging') or (last is not None and page >= int(last)):
                 break
             if page == config['max_pages']:
-                warnings.append(f'Seitenlimit für {query} erreicht; Suche unvollständig.')
+                warnings.append(f'Page limit reached for {query}; search incomplete.')
     return list(docs.values()), searches, warnings
 
 
@@ -271,42 +271,42 @@ def select(docs, config, client=None):
     kept = []
     for index, row in enumerate(rows):
         if client and index < config['detail_limit']:
-            print(f'Prüfe Beschreibung: {row["title"]}', flush=True)
+            print(f'Checking description: {row["title"]}', flush=True)
             # Network/access errors propagate to stop, rather than repeatedly hitting a block.
             source = client.get(row['url'])
             try:
                 detail = parse_detail(source)
             except ScrapeError:
-                row['notes'].append('Beschreibung nicht automatisch lesbar')
+                row['notes'].append('Description could not be read automatically')
             else:
                 row['description'] = detail['description']
                 row['detail_checked'] = bool(detail['description'])
                 if any(status in detail['availability'].lower() for status in ('soldout', 'outofstock', 'discontinued')):
-                    excluded.append({'id': row['id'], 'title': row['title'], 'reason': 'Nicht mehr verfügbar'})
+                    excluded.append({'id': row['id'], 'title': row['title'], 'reason': 'No longer available'})
                     continue
                 description = normalized(row['description'])
                 fault = fault_in_description(description)
                 if fault:
-                    excluded.append({'id': row['id'], 'title': row['title'], 'reason': 'Möglicher Defekt in Beschreibung: ' + fault.group()})
+                    excluded.append({'id': row['id'], 'title': row['title'], 'reason': 'Possible fault in description: ' + fault.group()})
                     continue
                 if re.search(r'\b(?:kan (?:aven )?skickas|skickas garna|frakt (?:ar )?mojligt|frakt erbjuds|can (?:be )?ship(?:ped)?)\b', description):
                     if not row['shipping']:
                         row['shipping'] = True
-                        row['shipping_source'] = 'Versand laut Beschreibung; Konditionen mit Verkäufer klären'
+                        row['shipping_source'] = 'Shipping offered in description; confirm terms with seller'
                 if re.search(r'\b(skickar inte|skickas inte|endast avhamtning|endast upphamtning|only pickup|no shipping)\b', description):
                     row['shipping'] = False
                     row['free_shipping'] = False
                     if not row['pickup']:
-                        excluded.append({'id': row['id'], 'title': row['title'], 'reason': 'Beschreibung schließt Versand aus'})
+                        excluded.append({'id': row['id'], 'title': row['title'], 'reason': 'Description rules out shipping'})
                         continue
-                    row['notes'].append('Laut Beschreibung nur Abholung')
+                    row['notes'].append('Pickup only according to description')
         if not row['shipping'] and not row['pickup']:
-            excluded.append({'id': row['id'], 'title': row['title'], 'reason': 'Kein bestätigter Versand und keine Abholung in Göteborg'})
+            excluded.append({'id': row['id'], 'title': row['title'], 'reason': 'No confirmed shipping and no pickup in Göteborg'})
             continue
         if not row['detail_checked']:
-            row['notes'].append('Nur Titel und Suchdaten geprüft')
+            row['notes'].append('Only title and search data checked')
         if row['price'] < 1500:
-            row['notes'].append('Sehr niedriger Preis: Lieferumfang genau prüfen')
+            row['notes'].append('Very low price: check exactly what is included')
         kept.append(row)
     return kept, excluded
 
@@ -358,13 +358,13 @@ def run(config, output, imports=None, cached=False):
         cache = json.loads((output / 'last-search.json').read_text(encoding='utf-8'))
         docs, searches, warnings = cache['docs'], cache['searches'], list(cache['warnings'])
         source_time = cache['fetched_at']
-        warnings.append('Suchdaten aus lokalem Cache; Beschreibungen erneut abgefragt.')
+        warnings.append('Search data from local cache; descriptions fetched again.')
     elif imports:
         docs = {}
         for path in imports:
             batch, _ = parse_search(Path(path).read_text(encoding='utf-8'))
             docs.update({str(d.get('id')): d for d in batch})
-        docs, searches, warnings = list(docs.values()), [], ['HTML-Import: Zeitpunkt der Angebote entspricht den gespeicherten Seiten; keine Live-Abfrage.']
+        docs, searches, warnings = list(docs.values()), [], ['HTML import: listings reflect the saved pages, not a live search.']
     else:
         docs, searches, warnings = collect(config, client)
         output.mkdir(parents=True, exist_ok=True)
@@ -379,12 +379,12 @@ def run(config, output, imports=None, cached=False):
               'scanned': len(docs), 'listings': rows, 'excluded': excluded,
               'searches': searches, 'warnings': warnings}
     save_report(output, report, None if imports else history)
-    print(f'\n{len(rows)} passende Angebote aus {len(docs)} Anzeigen. Preis ohne Versand/Käuferschutz.')
+    print(f'\n{len(rows)} matching listings out of {len(docs)} ads. Price excludes shipping/buyer protection.')
     for row in rows[:15]:
         print(f'{row["price"]:>5g} SEK | {row["location"]} | {row["title"]}\n  {row["url"]}')
     for warning in warnings:
-        print('Hinweis: ' + warning)
-    print(f'\nÜbersicht: {output / "angebote.html"}')
+        print('Note: ' + warning)
+    print(f'\nDashboard: {output / "angebote.html"}')
     return report
 
 
@@ -392,15 +392,15 @@ def main():
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(errors='replace')
         sys.stderr.reconfigure(errors='replace')
-    parser = argparse.ArgumentParser(description='Günstige PS5: Versand in Schweden oder Abholung Göteborg.')
+    parser = argparse.ArgumentParser(description='Affordable PS5: Shipping within Sweden or pickup in Göteborg.')
     parser.add_argument('--config', type=Path, default=ROOT / 'config.json')
-    parser.add_argument('--max-price', type=int, help='Maximalpreis in SEK')
-    parser.add_argument('--all-categories', action='store_true', help='Auch falsch kategorisierte Konsolen suchen (mehr Seiten)')
+    parser.add_argument('--max-price', type=int, help='Maximum price in SEK')
+    parser.add_argument('--all-categories', action='store_true', help='Include miscategorized consoles (more pages)')
     parser.add_argument('--output', type=Path, default=ROOT / 'output')
-    parser.add_argument('--open', action='store_true', help='Ergebnis im Browser öffnen')
-    parser.add_argument('--watch', type=int, metavar='SEKUNDEN', help='Wiederholt suchen, mindestens 600 Sekunden')
-    parser.add_argument('--import-html', nargs='+', metavar='DATEI', help='Gespeicherte Suchseiten offline auswerten')
-    parser.add_argument('--recheck-cache', action='store_true', help='Letzte Suchdaten neu filtern und Beschreibungen erneut abrufen')
+    parser.add_argument('--open', action='store_true', help='Open results in browser')
+    parser.add_argument('--watch', type=int, metavar='SECONDS', help='Repeat search, at least 600 seconds apart')
+    parser.add_argument('--import-html', nargs='+', metavar='FILE', help='Parse saved search pages offline')
+    parser.add_argument('--recheck-cache', action='store_true', help='Re-filter the last search data and fetch descriptions again')
     args = parser.parse_args()
     try:
         config = json.loads(args.config.read_text(encoding='utf-8-sig'))
@@ -410,18 +410,18 @@ def main():
             config['all_categories'] = True
         for key in ('max_price', 'deal_price', 'max_pages', 'detail_limit'):
             if type(config[key]) is not int or config[key] < (0 if key == 'detail_limit' else 1):
-                raise ValueError(f'{key} muss eine gültige ganze Zahl sein')
+                raise ValueError(f'{key} must be a valid integer')
         if config['request_delay'] < 1:
-            raise ValueError('request_delay muss mindestens 1 Sekunde sein')
+            raise ValueError('request_delay must be at least 1 second')
         for key in ('queries', 'pickup_cities'):
             if not isinstance(config[key], list) or not config[key] or not all(isinstance(x, str) and x.strip() for x in config[key]):
-                raise ValueError(f'{key} muss eine nichtleere Liste von Texten sein')
+                raise ValueError(f'{key} must be a non-empty list of strings')
         if args.watch is not None and args.watch < 600:
-            raise ValueError('--watch muss mindestens 600 Sekunden sein')
+            raise ValueError('--watch must be at least 600 seconds')
         if args.watch and args.import_html:
-            raise ValueError('--watch und --import-html sind nicht kombinierbar')
+            raise ValueError('--watch and --import-html cannot be combined')
         if args.recheck_cache and (args.watch or args.import_html):
-            raise ValueError('--recheck-cache ist nicht mit --watch oder --import-html kombinierbar')
+            raise ValueError('--recheck-cache cannot be combined with --watch or --import-html')
         while True:
             report = run(config, args.output.resolve(), args.import_html, args.recheck_cache)
             if args.open:
@@ -430,14 +430,14 @@ def main():
             if not args.watch:
                 return 0
             if any(row['new'] or row['price_drop'] for row in report['listings']):
-                print('\aNeue Treffer oder Preissenkungen!', flush=True)
-            print(f'Nächste Suche in {args.watch} Sekunden. Ende mit Strg+C.', flush=True)
+                print('\aNew matches or price drops!', flush=True)
+            print(f'Next search in {args.watch} seconds. Press Ctrl+C to stop.', flush=True)
             time.sleep(args.watch)
     except KeyboardInterrupt:
-        print('\nBeendet.')
+        print('\nStopped.')
         return 0
     except (ScrapeError, OSError, ValueError, KeyError, TypeError) as exc:
-        print(f'FEHLER: {exc}\nVorhandene Ergebnisse bleiben erhalten und sind möglicherweise veraltet.', file=sys.stderr)
+        print(f'ERROR: {exc}\nExisting results are preserved and may be outdated.', file=sys.stderr)
         return 1
 
 

@@ -1,49 +1,51 @@
-# Remote-Suche mit Telegram
+# Remote search with Telegram
 
 Repository: https://github.com/DieserLaurenz/ps5-blocket
 
-## Aktivieren
+## Enable
 
-`Setup-Telegram.cmd` auf deinem PC doppelklicken. Der Assistent fragt den Bot-Token unsichtbar ab, prüft ihn und zeigt eine einmalige Verbindungsnachricht. Diese Nachricht im privaten Chat mit deinem Bot senden. Dadurch wird die richtige Chat-ID ermittelt. Anschließend speichert der Assistent beide Werte als GitHub Actions Secrets, sendet eine Testnachricht, aktiviert den Zeitplan und startet sofort einen Suchlauf. Der Token wird nicht lokal gespeichert und steht nicht in der Kommandozeile oder im Repository.
+Double-click `Setup-Telegram.cmd` on your PC. The wizard reads the bot token through hidden input, verifies it and displays a one-time connection message. Send that message in a private chat with your bot to identify the correct chat ID. It then stores both values as GitHub Actions secrets, sends a test message, enables the schedule and starts a search immediately. The token is not saved locally or placed in command-line arguments or the repository.
 
-Bei BotFather `/newbot` verwenden, wenn du noch keinen eigenen Bot hast. BotFather ist lediglich die Bot-Verwaltung. Für dieses Projekt einen eigenen Bot ohne Webhook verwenden. Alternativ können `TELEGRAM_BOT_TOKEN` und `TELEGRAM_CHAT_ID` in den Repository-Secrets sowie `PS5_MONITOR_ENABLED=true` als Repository-Variable manuell angelegt werden.
+Use `/newbot` with BotFather if you do not have a bot yet. BotFather manages bots; use a separate bot without an active webhook for this project. Alternatively, manually create repository secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and repository variable `PS5_MONITOR_ENABLED=true`.
 
-## Verhalten
+## Behaviour
 
-- Zeitplan: `2-59/5 * * * *`, also Minute 2, 7, 12 usw., rund um die Uhr.
-- Jeder Lauf durchsucht beide Suchbegriffe in allen Kategorien bis 4.000 SEK. Versand in Schweden oder Abholung Göteborg; Einstellungen in `config.json`.
-- Beim ersten Lauf eine Nachricht pro passender Konsole, danach nur neue Anzeigen oder niedrigere Preise als bereits gemeldet. Preisbewegungen nach oben und zurück lösen keine Wiederholungen aus.
-- Eine tägliche Statusmeldung bestätigt die erfolgreiche Suche. Bleibt sie aus, die Actions-Seite prüfen.
-- Bestätigte Meldungen werden einzeln auf Branch `monitor-state` gespeichert. Dieser öffentliche Status enthält Anzeigen-IDs, Preise, Zeitstempel, eine Empfänger-Prüfsumme sowie die nachfolgend beschriebenen Bewertungs- und Vergleichsdaten, aber keine Chat-ID oder Tokens.
-- Bei einem Absturz genau zwischen Telegram-Zustellung und Speicherung kann eine Meldung doppelt erscheinen. Exakt einmalige Zustellung über zwei unabhängige Dienste ist nicht garantiert.
-- Der Workflow läuft höchstens acht Minuten; Läufe überschneiden sich nicht. Bei Ausfällen geht die Meldehistorie nicht verloren. Fehler erscheinen in GitHub Actions; ein späterer Zeitplanlauf versucht es erneut. Keine Umgehung von Blocket-Sperren.
-- Es werden keine Actions-Artefakte oder Actions-Caches gespeichert. Der Status erhält bei Änderungen einen Commit; identische Daten verursachen keinen neuen Commit.
+- Schedule: `2-59/5 * * * *` — minutes 2, 7, 12, etc., around the clock. Check the Actions history for automatic `schedule` events; successful manual runs alone do not verify the scheduler.
+- Each run searches both terms across all categories up to 4,000 SEK. Shipping within Sweden or pickup in Göteborg; settings are in `config.json`.
+- The first run sends one message per matching console. Later runs alert on new listings or prices below the lowest previously alerted price. A price going up and back down does not trigger a duplicate.
+- A daily status message confirms a successful search. If it stops arriving, check the Actions page.
+- Confirmed sends are persisted individually on branch `monitor-state`. This public state contains listing IDs, prices, timestamps, a recipient checksum and the assessment/reference data described below, but no chat ID or tokens.
+- A crash between Telegram delivery and state persistence can cause a duplicate. Exactly-once delivery across two independent services is not guaranteed.
+- Each workflow has an eight-minute timeout; runs do not overlap. Failures preserve notification history and appear in GitHub Actions. A later scheduled run can retry. Blocket access blocks are not bypassed.
+- No Actions artifacts or Actions caches are uploaded. State changes create commits; identical state does not.
+- Alerts, AI assessments, setup prompts and dashboard controls are in English. Original seller text is preserved. Old German AI assessments are regenerated under the normal API budget when their listings next qualify.
 
-## Angebotsbewertung
+## Offer assessment
 
-`Setup-KI.cmd` verbindet einen [Gemini-API-Key](https://aistudio.google.com/api-keys) als GitHub-Secret `GEMINI_API_KEY`. Für kostenlosen Betrieb einen Free-Tier-Schlüssel aus einem Projekt ohne aktivierte Abrechnung verwenden. Das Setup aktiviert keine Abrechnung. Der Key wird verdeckt eingegeben, nicht lokal gespeichert und nicht als Kommandozeilenargument übergeben. Gemini 3.1 Flash-Lite bietet derzeit einen [Free Tier](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.1-flash-lite); verfügbare Kontingente sind projektspezifisch und können sich ändern.
+`Setup-AI.cmd` (or the existing `Setup-KI.cmd` shortcut) stores a [Gemini API key](https://aistudio.google.com/api-keys) as GitHub secret `GEMINI_API_KEY`. For free operation, use a free-tier project without billing enabled. Setup does not enable billing. The key is entered invisibly, not stored locally and not passed as a command-line argument. See the [Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.1-flash-lite) for Gemini 3.1 Flash-Lite availability and free-tier terms; quotas vary by project and can change.
 
-Das Modell erhält nur den gekürzten Titel und Beschreibungstext. Erkennbare URLs, E-Mail-Adressen und Telefonnummern werden vorher entfernt. Keine Verkäuferprofile, Bilder, Chat-Nachrichten oder Telegram-Zugangsdaten werden an Google gesendet. Es extrahiert Modellvariante, Lieferumfang, genannte Mängel, Informationslücken und Nachfragen auf Deutsch. Verkäuferangaben sind nicht verifiziert; KI-Ergebnisse können Fehler enthalten. Es gibt keinen automatischen Kauf und keine vom Modell aufrufbaren Tools.
+The model receives only the shortened title and description. Recognizable URLs, email addresses and phone numbers are removed first. Seller profiles, images, chat messages and Telegram credentials are not sent to Google. It extracts model variant, included items, stated faults, information gaps and questions in English. Seller claims are unverified and AI output can be wrong. There is no automatic purchase and the model cannot call tools.
 
-Die KI bewertet keine Marktpreise aus ihrem Gedächtnis. Stattdessen sammelt der Scraper alle sechs Stunden eine getrennte Vergleichsstichprobe in der Kategorie „Spelkonsoler“ von 1.500 bis 10.000 SEK. Die Meldegrenze bleibt 4.000 SEK. Verglichen werden nur im Titel erkennbare gleiche Generationen und Disc/Digital-Varianten; erkennbare Bundles und der bewertete Artikel selbst sind ausgeschlossen. Mindestens fünf Vergleichsanzeigen sind erforderlich. Der Median und die Abweichung werden ausgewiesen; ab 10 % unter dem Median heißt die Einordnung „Preislich interessant“. Unbekannte Varianten, zu kleine Stichproben, über 24 Stunden alte oder durch das Seitenlimit abgeschnittene Vergleiche ergeben ausdrücklich kein Preisurteil. Die Stichprobe erfasst verlangte Preise, keine erzielten Verkaufspreise; Zustand, Zubehör, Versand und mögliche Fehlklassifizierungen bleiben Einschränkungen.
+The AI does not estimate market prices from memory. Instead, every six hours the scraper gathers a separate reference sample in “Spelkonsoler” from 1,500 to 10,000 SEK. The alert ceiling remains 4,000 SEK. Comparisons require the same identifiable generation and Disc/Digital edition; recognizable bundles and the assessed listing itself are excluded. At least five reference listings are required. The median and percentage difference are shown; 10% or more below the median is labelled “Attractive asking price”. Unknown variants, small samples, samples older than 24 hours or searches truncated by the page limit produce no price verdict. These are asking prices, not completed sales. Condition, accessories, shipping and possible classification errors remain limitations.
 
-Die KI-Bewertung ist rein ergänzend und entfernt keine zuvor passenden Treffer. Ohne Key, bei einem API-Ausfall oder ausgeschöpftem Kontingent gehen die normalen Meldungen mit einem Hinweis trotzdem raus. Bereits gemeldete Angebote bekommen einmal eine Ergänzung, sobald die KI-Bewertung erstmals verfügbar ist oder sich der ausgewertete Text geändert hat. Die bisher niedrigste gemeldete Preisschwelle bleibt erhalten.
+AI assessment is supplementary and never removes a qualifying match. Without a key, during an API outage or when quota is exhausted, normal alerts still go out with a notice. Previously alerted listings receive an update when an assessment first becomes available or its text/prompt changes. The lowest alerted price is preserved.
 
-Effizienz: Ergebnisse werden anhand von Titel/Beschreibung, Modell und Prompt-Version gespeichert; Preisänderungen allein lösen keinen neuen KI-Aufruf aus. Maximal 3 Aufrufe pro Lauf und 20 pro UTC-Tag, inklusive fehlgeschlagener Versuche. Bei 429/403/401 pausiert die KI sechs Stunden, bei anderen Fehlern mindestens 15 Minuten. Preisvergleich und Scraper laufen weiter. Der öffentliche Status speichert höchstens 200 kompakte KI-Auswertungen mit Texthashes (keine Rohbeschreibungen), einen Aufrufzähler und die Vergleichsstichprobe. Einstellungen stehen unter `assessment` in `config.json`; mit `enabled: false` kann die Bewertung ausgeschaltet werden.
+Efficiency: cache keys include title/description, model and prompt version; price-only changes do not trigger another AI request. Limits are 3 attempts per run and 20 per UTC day, including failed attempts. HTTP 429/403/401 pauses AI for six hours; other errors pause it for at least 15 minutes. Search and price comparison continue. Public state stores at most 200 compact assessments with text hashes (not raw descriptions), an attempt counter and the reference sample. Configure these under `assessment` in `config.json`; set `enabled: false` to disable assessment.
 
-## Kosten und Zeitplan
+## Costs and scheduling
 
-Standard-GitHub-Runner in öffentlichen Repositories sind laut [GitHub-Abrechnung](https://docs.github.com/en/billing/concepts/product-billing/github-actions) kostenlos. Dieser Workflow führt in privaten Repositories keine Jobs aus. Telegram-Bot-Nachrichten in diesem Umfang sind [kostenlos](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this).
+Standard GitHub-hosted runners in public repositories are [free](https://docs.github.com/en/billing/concepts/product-billing/github-actions). This workflow skips jobs in private repositories. Telegram bot messages at this volume are [free](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this).
 
-GitHub bietet [keine Garantie für einen exakten Fünf-Minuten-Takt](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule): Läufe können verspätet starten oder ausfallen. Öffentliche Zeitpläne können nach 60 Tagen ohne Repository-Aktivität deaktiviert werden. Dies ist keine dauerhaft garantierte Hosting-Zusage; die Plattformbedingungen gelten. Ein eigener bereits vorhandener Server mit Cron wäre zeitlich besser steuerbar, setzt aber entsprechende Hardware/Hosting voraus.
+GitHub [does not guarantee an exact five-minute interval](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule): runs can start late or be dropped. Public schedules may be disabled after 60 days without repository activity. This is not a permanent hosting guarantee; platform terms apply. Cron on an existing server offers more control over timing but requires hardware/hosting.
 
-## Bedienen
+## Controls
 
-- Sofort suchen: GitHub → Actions → PS5 Suche → Run workflow.
-- Erst ohne Nachrichten testen: dabei `dry_run` aktivieren.
-- Ausschalten: Actions → PS5 Suche → Menü → Disable workflow; alternativ `PS5_MONITOR_ENABLED=false` setzen.
-- Filter ändern: `config.json` auf Branch `main` bearbeiten.
-- Token wechseln: `Setup-Telegram.cmd` erneut ausführen.
-- Ohne GitHub auf einem vorhandenen Linux-Server: Secrets als Umgebungsvariablen setzen und mit Cron `*/5 * * * * flock -n /tmp/ps5-blocket.lock /usr/bin/python3 /pfad/ps5-blocket/monitor.py` starten. Der lokale Status liegt dann in `output/notifications.json`.
+- Search now: GitHub → Actions → PS5 Search → Run workflow.
+- Test without messages: enable `dry_run`.
+- Preview formatting: enable `preview_format` to send one current listing without changing alert history.
+- Disable: Actions → PS5 Search → menu → Disable workflow, or set `PS5_MONITOR_ENABLED=false`.
+- Change filters: edit `config.json` on branch `main`.
+- Change Telegram token: run `Setup-Telegram.cmd` again.
+- Without GitHub, on an existing Linux server: set secrets as environment variables and schedule `*/5 * * * * flock -n /tmp/ps5-blocket.lock /usr/bin/python3 /path/ps5-blocket/monitor.py` with cron. Local notification state is stored in `output/notifications.json`.
 
-Vor Aktivierung müssen die in der README genannten Blocket-Nutzungsbedingungen berücksichtigt werden. Ob Blocket Zugriffe aus GitHub-Rechenzentren akzeptiert, wird durch den Remote-Test geprüft und kann sich ändern.
+Before activation, consider the Blocket access requirements noted in the README. Whether Blocket accepts requests from GitHub data centres is checked by a remote run and can change.
