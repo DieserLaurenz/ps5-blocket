@@ -26,11 +26,21 @@ class Telegram:
     def __init__(self, fail_after=None):
         self.messages = []
         self.fail_after = fail_after
+        self.photo_batches = []
+        self.delivered_photos = 0
+        self.fail_photos_after = None
 
     def send(self, text, *, html=False):
         if self.fail_after is not None and len(self.messages) >= self.fail_after:
             raise m.ServiceError('test failure')
         self.messages.append(text)
+        return len(self.messages)
+
+    def send_photos(self, urls, caption, reply_to=None):
+        if self.fail_photos_after is not None and len(self.photo_batches) >= self.fail_photos_after:
+            raise m.ServiceError('photo test failure')
+        self.photo_batches.append((urls, caption, reply_to))
+        self.delivered_photos += len(urls)
 
 
 class MonitorTests(unittest.TestCase):
@@ -133,7 +143,8 @@ class MonitorTests(unittest.TestCase):
         from test_evaluator import analysis
         item = row()
         item.update(title='🎮&' * 300, location='🎮&' * 100, analysis=analysis(),
-                    price_comparison={'label': 'Price comparison pending: exact PS5 version unknown'})
+                    price_comparison={'label': 'X' * 180, 'median': 10000, 'percent': -20, 'count': 1000},
+                    seller_rating={'score': 4.8, 'best': 5, 'count': 1000000})
         item['analysis']['summary'] = '🎮&' * 180
         item['analysis']['seller_message_sv'] = '🎮' * 1000
         for field in ('included', 'positives', 'warnings', 'questions'):
@@ -161,11 +172,88 @@ class MonitorTests(unittest.TestCase):
         self.telegram.recipient = 'recipient'
         config = {'request_delay': 0}
         with patch('scraper.collect', return_value=([], [], [])), \
-             patch('scraper.select', return_value=([row()], [])), patch('evaluator.enrich'):
+             patch('scraper.select', return_value=([{**row(), 'photos_checked': True}], [])), patch('evaluator.enrich'):
             result = m.execute(config, self.store, self.telegram, preview_format=True)
         self.assertEqual(self.state, before)
         self.assertEqual(result['sent'], 1)
         self.assertIn('Format preview', self.telegram.messages[-1])
+
+    def test_photo_and_album_payloads(self):
+        telegram = m.Telegram('123:test', '456')
+        urls = ['https://images.blocketcdn.se/dynamic/960w/item/123/photo1',
+                'https://images.blocketcdn.se/dynamic/960w/item/123/photo2']
+        with patch('monitor.request_json', return_value={'ok': True}) as request:
+            telegram.send_photos(urls[:1], '<b>PS5</b>', 10)
+            self.assertTrue(request.call_args.args[0].endswith('/sendPhoto'))
+            self.assertEqual(request.call_args.kwargs['data']['photo'], urls[0])
+            telegram.send_photos(urls, '<b>PS5</b>', 10)
+            self.assertTrue(request.call_args.args[0].endswith('/sendMediaGroup'))
+            data = request.call_args.kwargs['data']
+            self.assertEqual(len(data['media']), 2)
+            self.assertEqual(data['reply_parameters']['message_id'], 10)
+            self.assertEqual(data['media'][0]['parse_mode'], 'HTML')
+            self.assertNotIn('caption', data['media'][1])
+        self.assertEqual(telegram.delivered_photos, 3)
+
+    def test_all_photos_are_batched_and_unchanged_run_sends_nothing(self):
+        item = {**row(), 'photos': [f'https://images.blocketcdn.se/dynamic/default/item/123/photo{i}' for i in range(21)]}
+        self.assertEqual(self.notify([item]), 1)
+        self.assertEqual([len(batch[0]) for batch in self.telegram.photo_batches], [10, 10, 1])
+        self.assertEqual(self.state['notified']['123']['photos_sent'], 21)
+        self.assertEqual(self.notify([item]), 0)
+        self.assertEqual(len(self.telegram.photo_batches), 3)
+
+    def test_partial_photo_failure_resumes_without_duplicate_text_or_photos(self):
+        item = {**row(), 'photos': [f'https://images.blocketcdn.se/dynamic/960w/item/123/photo{i}' for i in range(12)]}
+        self.telegram.fail_photos_after = 1
+        self.assertEqual(self.notify([item, row(identifier='456')]), 2)
+        record = self.state['notified']['123']
+        self.assertEqual(record['photos_sent'], 10)
+        self.assertEqual(record['photo_failures'], 1)
+        self.notify([item])  # Cooldown: no retry yet.
+        self.assertEqual(len(self.telegram.photo_batches), 1)
+        self.telegram.fail_photos_after = None
+        record['photo_retry_after'] = 0
+        self.assertEqual(self.notify([item]), 0)
+        self.assertEqual(len(self.telegram.messages), 2)
+        self.assertEqual([len(batch[0]) for batch in self.telegram.photo_batches], [10, 2])
+        self.assertEqual(record['photos_sent'], 12)
+
+    def test_gallery_fetch_is_only_for_alerts_missing_details(self):
+        from unittest.mock import Mock
+        client = Mock()
+        extras = {'photos': [], 'seller_rating': None, 'photos_checked': True}
+        with patch('scraper.parse_listing_extras', return_value=extras) as parse:
+            m.notify_rows([row()], self.state, self.store, self.telegram, 'now', client)
+            m.notify_rows([row()], self.state, self.store, self.telegram, 'later', client)
+        self.assertEqual(client.get.call_count, 1)
+        self.assertEqual(parse.call_count, 1)
+
+    def test_photo_retries_stop_after_three_failures(self):
+        item = {**row(), 'photos': ['https://images.blocketcdn.se/dynamic/960w/item/123/a']}
+        self.telegram.fail_photos_after = 0
+        self.notify([item])
+        record = self.state['notified']['123']
+        for _ in range(5):
+            record['photo_retry_after'] = 0
+            self.notify([item])
+        self.assertEqual(record['photo_failures'], 3)
+        self.assertEqual(len(self.telegram.messages), 1)
+
+    def test_optional_gallery_failure_does_not_block_text_alerts(self):
+        from unittest.mock import Mock
+        client = Mock()
+        client.get.side_effect = m.scraper.ScrapeError('access denied')
+        self.assertEqual(m.notify_rows([row(), row(identifier='456')], self.state, self.store,
+                                      self.telegram, 'now', client), 2)
+        self.assertEqual(client.get.call_count, 1)
+
+    def test_seller_rating_is_separate_from_ai_and_missing_is_explicit(self):
+        item = {**row(), 'seller_rating': {'score': 4.8, 'best': 5, 'count': 12}, 'photos_checked': True}
+        text = m.message_for(item)
+        self.assertIn('Seller rating: 4.8/5', text)
+        self.assertIn('12 reviews on Blocket', text)
+        self.assertIn('Seller rating: unavailable publicly', m.message_for({**item, 'seller_rating': None}))
 
 
 if __name__ == '__main__':

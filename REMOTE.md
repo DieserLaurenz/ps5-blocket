@@ -14,7 +14,7 @@ Use `/newbot` with BotFather if you do not have a bot yet. BotFather manages bot
 - Each run searches both terms across all categories up to 4,000 SEK. Shipping within Sweden or pickup in Göteborg; settings are in `config.json`.
 - The first run sends one message per matching console. Later runs alert on new listings or prices below the lowest previously alerted price. A price going up and back down does not trigger a duplicate.
 - A daily status message confirms a successful search. If it stops arriving, check the Actions page.
-- Confirmed sends are persisted individually on branch `monitor-state`. This public state contains listing IDs, prices, timestamps, a recipient checksum and the assessment/reference data described below, but no chat ID or tokens.
+- Confirmed sends are persisted individually on branch `monitor-state`. This public state contains listing IDs, prices, timestamps, a recipient checksum, Telegram message IDs, public listing-photo URLs and delivery progress, and the assessment/reference data described below, but no chat ID or tokens.
 - A crash between Telegram delivery and state persistence can cause a duplicate. Exactly-once delivery across two independent services is not guaranteed.
 - Each workflow has an eight-minute timeout; runs do not overlap. Failures preserve notification history and appear in GitHub Actions. A later scheduled run can retry. Blocket access blocks are not bypassed.
 - No Actions artifacts or Actions caches are uploaded. State changes create commits; identical state does not.

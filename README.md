@@ -8,6 +8,10 @@ Telegram messages use bold prices/headings and emojis for model, condition, ship
 
 Each offer alert also includes a copyable Swedish seller-message draft asking the listed open questions. It is generated and cached with the existing assessment, without a separate AI request. If AI is unavailable, a clearly labelled general Swedish message is provided instead. Review and send the draft yourself on Blocket; the scraper never contacts sellers.
 
+Public listing photos are attached below the text alert in albums of up to ten images (larger galleries use multiple batches). Only images belonging to that listing are included, not avatars or recommendations. Seller ratings are shown separately from AI assessments when an explicit seller aggregate and review count are publicly available; product ratings and promotional examples are ignored. Blocket currently requires login to view the seller profile on the checked listing, so its rating is labelled unavailable publicly. No Blocket login credentials are used.
+
+Gallery metadata is reused from description checks; new alerts without checked details get an additional public-page lookup. If that lookup fails, the alert uses the available cover photo and labels the gallery as unchecked. Photo-upload failures do not discard text alerts or block other matches. Confirmed batches are saved individually; unconfirmed batches can retry up to three times, one hour apart, while the listing still qualifies. As with text delivery, a crash between sending and saving can cause a duplicate. Review warnings in the Actions logs if photos are missing.
+
 ## Local use
 
 Windows and Python 3.10+. No additional packages, account or API key are needed for the basic local scraper.

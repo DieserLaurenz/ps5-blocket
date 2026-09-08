@@ -269,6 +269,12 @@ def enrich(rows, config, state, save, client, *, api_key=None, now=None, dry_run
         save(state)
 
 
+def telegram_escape(value, limit):
+    """Bound visible UTF-16 length before escaping, without splitting HTML or emoji."""
+    bounded = str(value).encode('utf-16-le', errors='replace')[:limit * 2].decode('utf-16-le', errors='ignore')
+    return escape(bounded)
+
+
 def seller_message_text(row):
     """Copyable draft only; no message is sent to the Blocket seller."""
     analysis = row.get('analysis') or {}
@@ -279,7 +285,7 @@ def seller_message_text(row):
         label = '💬 Swedish message · general fallback'
         draft = ('Hej! Finns din PS5 kvar? Fungerar den som den ska, '
                  'och vad ingår i köpet? Tack!')
-    return f'\n\n<b>{label}</b>\n<pre>{escape(clean_text(draft, SELLER_MESSAGE_LIMIT))}</pre>'
+    return f'\n\n<b>{label}</b>\n<pre>{telegram_escape(clean_text(draft, SELLER_MESSAGE_LIMIT), SELLER_MESSAGE_LIMIT)}</pre>'
 
 
 def assessment_text(row):
@@ -290,21 +296,21 @@ def assessment_text(row):
     parts = []
     if comparison:
         parts.append('\n\n📊 <b>Price comparison</b>')
-        parts.append(escape(comparison['label'][:180]))
+        parts.append(telegram_escape(comparison['label'], 180))
         if 'median' in comparison:
             parts.append(f"<b>{comparison['percent']:+d}%</b> vs. median: {comparison['median']:g} SEK · {comparison['count']} listings")
             parts.append('<i>Asking prices, not completed sales; condition/accessories may differ.</i>')
     if analysis:
         parts.append('\n🧠 <b>AI assessment</b>')
-        parts.append(escape(analysis['summary'][:180]))
+        parts.append(telegram_escape(analysis['summary'], 180))
         for field, label in [('included', '📦 Included according to seller'), ('positives', '✅ Highlights'),
                              ('warnings', '⚠️ Unknowns / things to check'), ('questions', '❓ Ask the seller')]:
             if analysis[field]:
                 parts.append(f'\n<b>{label}</b>')
-                parts.extend('• ' + escape(item[:120]) for item in analysis[field][:2 if field == 'questions' else 3])
+                parts.extend('• ' + telegram_escape(item, 120) for item in analysis[field][:2 if field == 'questions' else 3])
         if not analysis['included']:
             parts.append('\n📦 <b>Included:</b> not clearly specified')
         parts.append('\n<i>AI reads listing text only. Condition and seller reliability are not verified.</i>')
     else:
-        parts.append('\n🧠 ' + escape(row.get('ai_status', 'AI assessment unavailable')[:250]))
+        parts.append('\n🧠 ' + telegram_escape(row.get('ai_status', 'AI assessment unavailable'), 250))
     return '\n'.join(parts)

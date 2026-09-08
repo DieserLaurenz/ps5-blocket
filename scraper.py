@@ -7,6 +7,7 @@ import csv
 import html
 import io
 import json
+import math
 import re
 import sys
 import time
@@ -100,6 +101,86 @@ def parse_detail(source):
                     'availability': offer.get('availability', ''),
                 }
     raise ScrapeError('Listing description not found')
+
+
+def photo_urls(values, identifier):
+    """Only this listing's Blocket CDN images, not profiles or recommendations."""
+    result = []
+    for value in values:
+        if isinstance(value, dict):
+            value = value.get('uri') or value.get('url') or value.get('contentUrl')
+        if not isinstance(value, str):
+            continue
+        try:
+            url = urllib.parse.urlsplit(value)
+            match = re.fullmatch(r'/dynamic/(?:default|\d+w)/item/([0-9]+)/([a-zA-Z0-9._-]{1,120})', url.path)
+            if (url.scheme != 'https' or url.netloc != 'images.blocketcdn.se' or not match
+                    or match[1] != str(identifier)):
+                continue
+            # Publicly supported display size; avoids sending full-resolution originals.
+            photo = f'https://images.blocketcdn.se/dynamic/960w/item/{match[1]}/{match[2]}'
+            if photo not in result:
+                result.append(photo)
+        except ValueError:
+            continue
+    return result
+
+
+def seller_rating(value):
+    """Parse an explicit seller aggregate, never a product rating or AI score."""
+    if not isinstance(value, dict):
+        return None
+    def number(raw):
+        if isinstance(raw, bool):
+            raise ValueError
+        result = float(str(raw).replace(',', '.'))
+        if not math.isfinite(result):
+            raise ValueError
+        return result
+    try:
+        score = number(value['ratingValue'])
+        count = number(value.get('ratingCount', value.get('reviewCount')))
+        best = number(value['bestRating']) if 'bestRating' in value else None
+        if not 0 <= score <= 100 or not 1 <= count <= 1_000_000_000 or count != int(count) or (best is not None and (not 0 < best <= 100 or score > best)):
+            return None
+        return {'score': score, 'count': int(count), 'best': best}
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+
+
+def parse_listing_extras(source, identifier):
+    photos, rating = [], None
+    for attrs, raw in scripts(source):
+        try:
+            marker = re.search(r'window\.__staticRouterHydrationData\s*=\s*JSON\.parse\(', raw)
+            if marker:
+                # Decode JSON only; never execute the page's JavaScript.
+                encoded, _ = json.JSONDecoder().raw_decode(raw[marker.end():].lstrip())
+                state = json.loads(encoded)
+                data = state.get('loaderData', {}).get('item-recommerce', {})
+                item = data.get('itemData') or {}
+                if str((item.get('meta') or {}).get('adId')) != str(identifier):
+                    continue
+                photos.extend(item.get('images') or [])
+                profile = data.get('profileData') or {}
+                if isinstance(profile, dict):
+                    rating = seller_rating(profile.get('aggregateRating')) or rating
+            if attrs.get('type') == 'application/ld+json':
+                for product in walk_json(json.loads(raw)):
+                    if product.get('@type') != 'Product' or str(product.get('sku')) != str(identifier):
+                        continue
+                    images = product.get('image') or []
+                    photos.extend(images if isinstance(images, list) else [images])
+                    offers = product.get('offers') or []
+                    for offer in offers if isinstance(offers, list) else [offers]:
+                        seller = offer.get('seller') if isinstance(offer, dict) else None
+                        if isinstance(seller, dict):
+                            rating = seller_rating(seller.get('aggregateRating')) or rating
+        except (ValueError, KeyError, TypeError, AttributeError):
+            # Missing optional metadata must not discard an otherwise valid offer.
+            continue
+    return {'photos': photo_urls(photos, identifier), 'seller_rating': rating,
+            'photos_checked': True}
 
 
 def normalized(value):
@@ -199,6 +280,8 @@ def listing(doc, config, require_delivery=True):
         'shipping_source': 'Blocket shipping flag' if shipping else '',
         'url': f'https://www.blocket.se/recommerce/forsale/item/{identifier}',
         'image': (doc.get('image') or {}).get('url', ''), 'model': model,
+        'photos': photo_urls([(doc.get('image') or {}).get('url', '')], identifier),
+        'photos_checked': False, 'seller_rating': None,
         'description': '', 'detail_checked': False, 'notes': [],
     }, ''
 
@@ -274,6 +357,9 @@ def select(docs, config, client=None):
             print(f'Checking description: {row["title"]}', flush=True)
             # Network/access errors propagate to stop, rather than repeatedly hitting a block.
             source = client.get(row['url'])
+            extras = parse_listing_extras(source, row['id'])
+            extras['photos'] = extras['photos'] or row['photos']
+            row.update(extras)
             try:
                 detail = parse_detail(source)
             except ScrapeError:
