@@ -8,5 +8,120 @@
     }
   },
   "last_health_day": "2026-09-08",
-  "last_health_at": "2026-09-08T14:19:46+00:00"
+  "last_health_at": "2026-09-08T14:19:46+00:00",
+  "market": {
+    "attempted_at": 1788878402.3362422,
+    "fetched_at": 1788878402.3362422,
+    "max_price": 10000,
+    "truncated": false,
+    "samples": [
+      {
+        "id": "25721622",
+        "price": 5200,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "26007477",
+        "price": 5699,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "26383713",
+        "price": 6195,
+        "generation": "slim",
+        "edition": "disc"
+      },
+      {
+        "id": "26404991",
+        "price": 6200,
+        "generation": "slim",
+        "edition": "disc"
+      },
+      {
+        "id": "21577728",
+        "price": 6495,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "26336589",
+        "price": 6500,
+        "generation": "slim",
+        "edition": "disc"
+      },
+      {
+        "id": "26410755",
+        "price": 6600,
+        "generation": "slim",
+        "edition": "disc"
+      },
+      {
+        "id": "24509418",
+        "price": 6777,
+        "generation": "original",
+        "edition": "digital"
+      },
+      {
+        "id": "26027458",
+        "price": 8500,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "26408193",
+        "price": 5800,
+        "generation": "slim",
+        "edition": "disc"
+      },
+      {
+        "id": "24267371",
+        "price": 5999,
+        "generation": "original",
+        "edition": "disc"
+      },
+      {
+        "id": "24266095",
+        "price": 6499,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "26292172",
+        "price": 6500,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "25389451",
+        "price": 6500,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "24267324",
+        "price": 6699,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "25655273",
+        "price": 6700,
+        "generation": "slim",
+        "edition": "disc"
+      },
+      {
+        "id": "24267178",
+        "price": 6899,
+        "generation": "slim",
+        "edition": "disc"
+      }
+    ]
+  },
+  "ai_cache": {},
+  "ai_budget": {
+    "day": "2026-09-08",
+    "calls": 1
+  }
 }
