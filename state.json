@@ -119,9 +119,16 @@
       }
     ]
   },
-  "ai_cache": {},
+  "ai_cache": {
+    "26383284": {
+      "fingerprint": "96f12d111fa484dfa47294ab2b32459463311730a731aa5d5779845b0f8072a9",
+      "retry_after": 1788882002.3362422,
+      "created_at": 1788878402.3362422
+    }
+  },
   "ai_budget": {
     "day": "2026-09-08",
-    "calls": 1
+    "calls": 1,
+    "blocked_until": 1788879302.3362422
   }
 }
