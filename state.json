@@ -122,26 +122,26 @@
   },
   "ai_cache": {
     "26383284": {
-      "fingerprint": "4943908791498920bc4abab34208c87f9c8ffedc995670354d1b2365a6ff6c68",
+      "fingerprint": "8384170a293ac4ca4e09d1a52930adf2c98e975035f2014cb40ed82727cb3db8",
       "analysis": {
         "generation": "unknown",
         "edition": "unknown",
         "condition": "unknown",
-        "summary": "Die Anzeige nennt lediglich eine PS5 mit optischen Anpassungen. Modellgeneration, Edition und technischer Zustand bleiben v\u00f6llig unklar.",
+        "summary": "The listing describes a PS5 console with custom aesthetic modifications. Technical specifications, edition, and functional condition are not provided.",
         "included": [],
         "positives": [],
         "warnings": [
-          "Keine Angaben zu Modellgeneration oder Edition.",
-          "Zustand der Konsole wird nicht beschrieben.",
-          "Keine Informationen zu mitgeliefertem Zubeh\u00f6r oder Kabeln."
+          "Custom stickers or logos do not indicate technical modifications.",
+          "Functional condition is not stated.",
+          "Edition and generation are not specified."
         ],
         "questions": [
-          "Handelt es sich um die Disc- oder Digital-Edition?",
-          "Ist das Originalzubeh\u00f6r wie Controller und Kabel im Lieferumfang enthalten?"
+          "Is this the disc or digital edition?",
+          "Is the console fully functional and does it come with any original accessories like controllers or cables?"
         ],
         "confidence": "low"
       },
-      "created_at": 1788878893.6087444
+      "created_at": 1788880312.027495
     }
   },
   "ai_budget": {
