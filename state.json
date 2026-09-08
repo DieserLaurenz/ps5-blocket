@@ -11,14 +11,14 @@
   "last_health_day": "2026-09-08",
   "last_health_at": "2026-09-08T14:19:46+00:00",
   "market": {
-    "attempted_at": 1788878402.3362422,
-    "fetched_at": 1788878402.3362422,
+    "attempted_at": 1788900095.442904,
+    "fetched_at": 1788900095.442904,
     "max_price": 10000,
     "truncated": false,
     "samples": [
       {
-        "id": "25721622",
-        "price": 5200,
+        "id": "20874533",
+        "price": 5500,
         "generation": "slim",
         "edition": "digital"
       },
@@ -65,8 +65,8 @@
         "edition": "digital"
       },
       {
-        "id": "26027458",
-        "price": 8500,
+        "id": "26427627",
+        "price": 9000,
         "generation": "slim",
         "edition": "digital"
       },
