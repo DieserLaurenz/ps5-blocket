@@ -145,6 +145,31 @@
         "confidence": "low"
       },
       "created_at": 1788882493.8740423
+    },
+    "26437120": {
+      "fingerprint": "95e7aea9830ac43b1f9b6103233c1aab0cf03a968326622022209aa823ff9cca",
+      "analysis": {
+        "generation": "unknown",
+        "edition": "disc",
+        "condition": "used",
+        "summary": "Used PS5 disc edition with two controllers. The description is incomplete and cuts off, leaving the console's overall condition and included cables unknown.",
+        "included": [
+          "PS5 console",
+          "Two DualSense controllers"
+        ],
+        "positives": [],
+        "warnings": [
+          "Description is incomplete and cuts off mid-sentence",
+          "Condition of the console is not fully specified"
+        ],
+        "questions": [
+          "Could you please clarify the full condition of the console and if all original cables are included?",
+          "Is the original receipt available?"
+        ],
+        "seller_message_sv": "Hej! \u00c4r konsolen fortfarande tillg\u00e4nglig? Skulle du kunna f\u00f6rtydliga konsolens skick och om alla originalkablar ing\u00e5r? Finns kvitto kvar? Tack!",
+        "confidence": "medium"
+      },
+      "created_at": 1788900696.310418
     }
   },
   "ai_budget": {
