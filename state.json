@@ -122,36 +122,30 @@
   },
   "ai_cache": {
     "26383284": {
-      "fingerprint": "1a39d912ce6797059daa90012f222f22cecec7ea38ef9bfdd58a5684b5e22c3a",
+      "fingerprint": "4943908791498920bc4abab34208c87f9c8ffedc995670354d1b2365a6ff6c68",
       "analysis": {
         "generation": "unknown",
         "edition": "unknown",
         "condition": "unknown",
-        "summary": "Die Anzeige nennt nur das Modell PS5. Es fehlen Angaben zu Edition (Disc/Digital), Generation, Zustand und Lieferumfang. Eine Modifikation am Geh\u00e4use ist vorhanden.",
-        "included": [
-          "Konsole mit wei\u00dfen Seitenteilen",
-          "Schwarzes Mittelteil"
-        ],
-        "positives": [
-          "Optische Modifikation durch Monster-Logo erw\u00e4hnt"
-        ],
+        "summary": "Die Anzeige nennt lediglich eine PS5 mit optischen Anpassungen. Modellgeneration, Edition und technischer Zustand bleiben v\u00f6llig unklar.",
+        "included": [],
+        "positives": [],
         "warnings": [
-          "Keine Angaben zum technischen Zustand",
-          "Edition (Disc oder Digital) nicht spezifiziert",
-          "Modifikation am Geh\u00e4use k\u00f6nnte Garantie beeinflussen"
+          "Keine Angaben zu Modellgeneration oder Edition.",
+          "Zustand der Konsole wird nicht beschrieben.",
+          "Keine Informationen zu mitgeliefertem Zubeh\u00f6r oder Kabeln."
         ],
         "questions": [
-          "Handelt es sich um die Disc- oder die Digital-Edition?",
-          "Ist die Konsole technisch einwandfrei und in welchem Zustand befindet sie sich?"
+          "Handelt es sich um die Disc- oder Digital-Edition?",
+          "Ist das Originalzubeh\u00f6r wie Controller und Kabel im Lieferumfang enthalten?"
         ],
         "confidence": "low"
       },
-      "created_at": 1788878711.482736
+      "created_at": 1788878893.6087444
     }
   },
   "ai_budget": {
     "day": "2026-09-08",
-    "calls": 3,
-    "blocked_until": 1788879302.3362422
+    "calls": 3
   }
 }
