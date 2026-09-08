@@ -1,10 +1,12 @@
 # PS5-Angebote auf Blocket
 
+Der Remote-Suchdienst läuft über [GitHub Actions](https://github.com/DieserLaurenz/ps5-blocket/actions/workflows/monitor.yml) mit einem Fünf-Minuten-Zeitplan und Telegram-Benachrichtigungen. Neue passende Anzeigen, neue Tiefpreise und eine tägliche Statusmeldung gehen an den verbundenen Bot-Chat. Einrichtung, Kostenrahmen und Bedienung: [REMOTE.md](REMOTE.md).
+
 Lokaler Scraper für Windows und Python 3.10+. Keine zusätzlichen Pakete, kein Konto oder API-Schlüssel nötig.
 
 `Start.cmd` doppelklicken: sucht aktuell und öffnet `output/angebote.html` im Browser.
 `Monitor.cmd` sucht alle 15 Minuten, solange das Fenster geöffnet ist. Strg+C beendet den Monitor.
-Neue Treffer und Preissenkungen erscheinen in der Übersicht und werden im Terminal mit einem Signalton angekündigt; keine E-Mails oder Nachrichten.
+In diesem lokalen Modus erscheinen neue Treffer und Preissenkungen in der Übersicht und werden im Terminal mit einem Signalton angekündigt. Telegram läuft separat über den Remote-Dienst und benötigt keinen eingeschalteten PC.
 
 Voreinstellung: bis einschließlich **4.000 SEK**, Versand innerhalb Schwedens oder Abholung in **Göteborg**. Versand wird anhand von Blockets `shipping_exists` oder einer ausdrücklichen Versandzusage in der geprüften Beschreibung erkannt. Die Quelle wird pro Treffer angezeigt; unbekannter Versand außerhalb Göteborgs wird ausgeschlossen. Göteborg wird anhand des Ortsnamens erkannt, nicht als Umkreis. Stadtteile, die Blocket separat benennt, können in `pickup_cities` ergänzt werden.
 
