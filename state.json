@@ -122,26 +122,29 @@
   },
   "ai_cache": {
     "26383284": {
-      "fingerprint": "8384170a293ac4ca4e09d1a52930adf2c98e975035f2014cb40ed82727cb3db8",
+      "fingerprint": "0f16bfa233945dba3331270b871e4412115563eaaebc6e22ba994ebb5c645b00",
       "analysis": {
         "generation": "unknown",
         "edition": "unknown",
         "condition": "unknown",
-        "summary": "The listing describes a PS5 console with custom aesthetic modifications. Technical specifications, edition, and functional condition are not provided.",
-        "included": [],
+        "summary": "Listing for a white PS5 with custom decals. Generation, edition, and functional condition are not specified.",
+        "included": [
+          "Console"
+        ],
         "positives": [],
         "warnings": [
-          "Custom stickers or logos do not indicate technical modifications.",
-          "Functional condition is not stated.",
-          "Edition and generation are not specified."
+          "Custom decals applied to the console",
+          "Generation and edition are not specified",
+          "Functional condition is not described"
         ],
         "questions": [
-          "Is this the disc or digital edition?",
+          "Is this the disc or digital edition, and which generation (original, slim, or pro) is it?",
           "Is the console fully functional and does it come with any original accessories like controllers or cables?"
         ],
+        "seller_message_sv": "Hej! \u00c4r detta disc- eller digital-versionen och vilken generation (original, slim eller pro) \u00e4r det? \u00c4r konsolen fullt fungerande och ing\u00e5r n\u00e5gra originaltillbeh\u00f6r som handkontroller eller kablar? Tack!",
         "confidence": "low"
       },
-      "created_at": 1788880312.027495
+      "created_at": 1788882493.8740423
     }
   },
   "ai_budget": {
