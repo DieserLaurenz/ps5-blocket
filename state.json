@@ -121,9 +121,31 @@
   },
   "ai_cache": {
     "26383284": {
-      "fingerprint": "96f12d111fa484dfa47294ab2b32459463311730a731aa5d5779845b0f8072a9",
-      "retry_after": 1788882002.3362422,
-      "created_at": 1788878402.3362422
+      "fingerprint": "1a39d912ce6797059daa90012f222f22cecec7ea38ef9bfdd58a5684b5e22c3a",
+      "analysis": {
+        "generation": "unknown",
+        "edition": "unknown",
+        "condition": "unknown",
+        "summary": "Die Anzeige nennt nur das Modell PS5. Es fehlen Angaben zu Edition (Disc/Digital), Generation, Zustand und Lieferumfang. Eine Modifikation am Geh\u00e4use ist vorhanden.",
+        "included": [
+          "Konsole mit wei\u00dfen Seitenteilen",
+          "Schwarzes Mittelteil"
+        ],
+        "positives": [
+          "Optische Modifikation durch Monster-Logo erw\u00e4hnt"
+        ],
+        "warnings": [
+          "Keine Angaben zum technischen Zustand",
+          "Edition (Disc oder Digital) nicht spezifiziert",
+          "Modifikation am Geh\u00e4use k\u00f6nnte Garantie beeinflussen"
+        ],
+        "questions": [
+          "Handelt es sich um die Disc- oder die Digital-Edition?",
+          "Ist die Konsole technisch einwandfrei und in welchem Zustand befindet sie sich?"
+        ],
+        "confidence": "low"
+      },
+      "created_at": 1788878711.482736
     }
   },
   "ai_budget": {
