@@ -6,6 +6,8 @@ Telegram offers include an English AI text assessment and, when enough comparabl
 
 Telegram messages use bold prices/headings and emojis for model, condition, shipping/pickup and location. Included items, unknowns and questions have separate sections. Missing information is explicitly marked. Under “Run workflow”, enable `preview_format` to send one current listing as a format preview without changing notification history. Original seller titles and descriptions remain in Swedish; AI summaries and questions are in English.
 
+Each offer alert also includes a copyable Swedish seller-message draft asking the listed open questions. It is generated and cached with the existing assessment, without a separate AI request. If AI is unavailable, a clearly labelled general Swedish message is provided instead. Review and send the draft yourself on Blocket; the scraper never contacts sellers.
+
 ## Local use
 
 Windows and Python 3.10+. No additional packages, account or API key are needed for the basic local scraper.

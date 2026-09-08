@@ -138,6 +138,7 @@ def message_for(row, old_price=None, assessment_update=False, preview=False):
             f'📍 {escape(row["location"][:100])}\n{delivery}\n'
             '<i>Shipping and buyer protection may cost extra.</i>'
             + evaluator.assessment_text(row)
+            + evaluator.seller_message_text(row)
             + f'\n\n🔗 <a href="https://www.blocket.se/recommerce/forsale/item/{identifier}">View listing on Blocket</a>')
 
 

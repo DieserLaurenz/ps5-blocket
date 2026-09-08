@@ -21,7 +21,8 @@ def row(identifier='123', price=3000):
 def analysis():
     return {'generation': 'slim', 'edition': 'disc', 'condition': 'used', 'summary': 'Working according to seller.',
             'included': ['Two controllers'], 'positives': [], 'warnings': ['Receipt not mentioned'],
-            'questions': ['Is the receipt available?'], 'confidence': 'medium'}
+            'questions': ['Is the receipt available?'],
+            'seller_message_sv': 'Hej! Finns kvittot kvar? Tack!', 'confidence': 'medium'}
 
 
 class EvaluatorTests(unittest.TestCase):
@@ -42,6 +43,38 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual(generate.call_count, 1)
         self.assertEqual(first['assessment_id'], second['assessment_id'])
         self.assertEqual(second['ai_status'], 'cached')
+        self.assertEqual(second['analysis']['seller_message_sv'], first['analysis']['seller_message_sv'])
+
+    def test_previous_assessment_is_refreshed_for_swedish_draft(self):
+        item = row()
+        previous = analysis()
+        del previous['seller_message_sv']
+        with patch('evaluator.PROMPT_VERSION', 3):
+            old_digest = e.fingerprint(item)
+        self.state['ai_cache'] = {item['id']: {'fingerprint': old_digest, 'analysis': previous}}
+        with patch('evaluator.generate', return_value=analysis()) as generate:
+            self.enrich([item])
+        generate.assert_called_once()
+        self.assertIn('seller_message_sv', item['analysis'])
+        self.assertNotEqual(item['assessment_id'], old_digest)
+
+    def test_swedish_draft_is_validated_bounded_and_sanitized(self):
+        for value in (None, [], ''):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                e.validate_analysis({**analysis(), 'seller_message_sv': value})
+        value = analysis()
+        value['seller_message_sv'] = 'Hej! https://evil.invalid test@example.com ' + 'x' * 1000
+        draft = e.validate_analysis(value)['seller_message_sv']
+        self.assertLessEqual(len(draft), e.SELLER_MESSAGE_LIMIT)
+        self.assertNotIn('evil.invalid', draft)
+        self.assertNotIn('test@example.com', draft)
+
+    def test_swedish_draft_copy_block_and_fallback(self):
+        self.assertIn('<pre>Hej! Finns kvittot kvar? Tack!</pre>',
+                      e.seller_message_text({'analysis': analysis()}))
+        fallback = e.seller_message_text({})
+        self.assertIn('general fallback', fallback)
+        self.assertIn('Finns din PS5 kvar?', fallback)
 
     def test_changed_description_is_reanalyzed(self):
         with patch('evaluator.generate', return_value=analysis()) as generate:

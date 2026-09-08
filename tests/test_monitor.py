@@ -120,10 +120,12 @@ class MonitorTests(unittest.TestCase):
                     analysis=analysis(), url='https://evil.invalid')
         item['analysis']['summary'] = '<i>Fake formatting & claim</i>'
         item['analysis']['warnings'] = ['</b><script>bad</script>']
+        item['analysis']['seller_message_sv'] = 'Hej! </pre><b>Fake & claim</b>'
         text = m.message_for(item)
         self.assertIn('&lt;b&gt;PS5 &amp; extras&lt;/b&gt;', text)
         self.assertIn('&lt;i&gt;Fake formatting &amp; claim&lt;/i&gt;', text)
         self.assertNotIn('<script>', text)
+        self.assertIn('<pre>Hej! &lt;/pre&gt;&lt;b&gt;Fake &amp; claim&lt;/b&gt;</pre>', text)
         self.assertNotIn('<a href="https://evil.invalid">', text)
         self.assertIn('<a href="https://www.blocket.se/', text)
 
@@ -133,6 +135,7 @@ class MonitorTests(unittest.TestCase):
         item.update(title='🎮&' * 300, location='🎮&' * 100, analysis=analysis(),
                     price_comparison={'label': 'Price comparison pending: exact PS5 version unknown'})
         item['analysis']['summary'] = '🎮&' * 180
+        item['analysis']['seller_message_sv'] = '🎮' * 1000
         for field in ('included', 'positives', 'warnings', 'questions'):
             item['analysis'][field] = ['🎮&' * 120] * 3
         class Parser(HTMLParser):
