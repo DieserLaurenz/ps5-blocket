@@ -6,6 +6,19 @@
       "price": 3500,
       "sent_at": "2026-09-08T15:48:17+00:00",
       "assessment_id": "0f16bfa233945dba3331270b871e4412115563eaaebc6e22ba994ebb5c645b00"
+    },
+    "26437120": {
+      "price": 4000,
+      "sent_at": "2026-09-08T20:51:40+00:00",
+      "assessment_id": "95e7aea9830ac43b1f9b6103233c1aab0cf03a968326622022209aa823ff9cca",
+      "message_id": 18,
+      "photo_urls": [
+        "https://images.blocketcdn.se/dynamic/960w/item/26437120/70b4bfc2-4848-4812-a8dd-f52915c6cc8a",
+        "https://images.blocketcdn.se/dynamic/960w/item/26437120/23a6d094-979f-47a5-80db-276ddff2c76b",
+        "https://images.blocketcdn.se/dynamic/960w/item/26437120/af17c95a-92e5-4112-822e-834a446508ca",
+        "https://images.blocketcdn.se/dynamic/960w/item/26437120/10bf45d1-54fc-4372-81d3-57f0a310441d"
+      ],
+      "photos_sent": 0
     }
   },
   "last_health_day": "2026-09-08",
