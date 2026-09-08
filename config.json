@@ -1,0 +1,10 @@
+{
+  "max_price": 4000,
+  "deal_price": 3000,
+  "queries": ["ps5", "playstation 5"],
+  "pickup_cities": ["Göteborg", "Gothenburg", "Goteborg"],
+  "max_pages": 40,
+  "request_delay": 2,
+  "detail_limit": 12,
+  "all_categories": true
+}

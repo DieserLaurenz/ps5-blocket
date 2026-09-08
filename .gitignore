@@ -1,0 +1,10 @@
+__pycache__/
+output/
+samples/
+sample*.html
+inspect_page.py
+.env
+.env.*
+!.env.example
+*.log
+secrets*.json

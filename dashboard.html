@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PS5 · Schweden</title>
+<style>
+:root{color-scheme:dark;font-family:Segoe UI,system-ui,sans-serif;background:#10151c;color:#eef2f8}*{box-sizing:border-box}body{max-width:1180px;margin:auto;padding:40px 24px}header{border-bottom:1px solid #334151;padding-bottom:28px}small,.muted{color:#a4b4c8}h1{font-size:clamp(32px,6vw,56px);letter-spacing:-2px;margin:12px 0}h1 span{color:#96edaa}p{line-height:1.6}.filters{display:flex;flex-wrap:wrap;gap:16px;align-items:end;padding:24px 0}label{display:grid;gap:7px;font-size:14px}input,select{background:#1c2632;border:1px solid #465467;color:inherit;padding:10px;border-radius:8px}input[type=number]{width:150px}#cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(285px,1fr));gap:18px}.card{border:1px solid #344253;border-radius:14px;overflow:hidden;background:#18212d;display:flex;flex-direction:column}.card img{width:100%;height:205px;object-fit:contain;background:#f4f4f4}.body{padding:20px;display:flex;flex:1;flex-direction:column}.price{font-size:29px;font-weight:700;margin:10px 0}.tags{display:flex;gap:7px;flex-wrap:wrap}.tag{font-size:12px;padding:4px 8px;border-radius:6px;background:#2c3a4c}.deal{background:#244936;color:#aff3c0}.card h2{font-size:18px;line-height:1.4;margin:12px 0}.card a{display:block;text-decoration:none;color:#11201a;background:#96edaa;padding:12px;text-align:center;border-radius:8px;font-weight:600;margin-top:auto}.card p{font-size:14px}summary{cursor:pointer}details{font-size:13px;color:#bbc8d8;margin:16px 0}pre{white-space:pre-wrap;font-family:inherit;line-height:1.5}#warning{color:#ffcf88}footer{padding:28px 0;color:#a4b4c8;font-size:13px}a{color:#96edaa}#count{margin:0 0 20px}noscript{display:block;padding:20px}
+</style>
+<header><small>BLOCKET DEAL FINDER / SCHWEDEN</small><h1>Deine nächste <span>PS5.</span></h1>
+<p>Versand innerhalb Schwedens · Abholung in Göteborg<br><span class="muted" id="stamp"></span></p>
+<p id="warning"></p></header>
+<div class="filters">
+<label>Maximalpreis · SEK<input id="max" type="number" min="0" step="100"></label>
+<label>Ort oder Titel<input id="query" type="search" placeholder="z. B. Göteborg oder Slim"></label>
+<label>Lieferung<select id="delivery"><option value="all">Alle passenden</option><option value="shipping">Mit Versand</option><option value="pickup">Abholung Göteborg</option></select></label>
+<label>Sortieren<select id="sort"><option value="price">Günstigste zuerst</option><option value="new">Neu entdeckt zuerst</option><option value="drop">Größte Preissenkung</option></select></label>
+</div><p id="count" class="muted"></p><main id="cards"></main>
+<noscript>Bitte JavaScript aktivieren oder die Datei angebote.csv öffnen.</noscript>
+<footer>Preise in SEK, zuzüglich möglicher Versandkosten und Käuferschutzgebühren. „Neu“ bedeutet erstmals vom Scraper gefunden.
+Die Erkennung anhand von Titel und Beschreibung kann Fehler machen; Zustand und Lieferumfang in der Anzeige prüfen.
+„Beschreibung geprüft“ bedeutet ausschließlich automatischer Textfilter. Versandmarkierung gilt nicht automatisch für Versand ins Ausland.
+<p>Aktualisieren: Start.cmd erneut ausführen. Ein Neuladen dieser Datei startet keine Suche.
+Bei laufendem Monitor lädt die Übersicht alle 60 Sekunden den letzten gespeicherten Stand.</p>
+<details><summary>Suchumfang und ausgeschlossene Anzeigen</summary><pre id="diagnostics"></pre></details></footer>
+<script type="application/json" id="data">__REPORT_JSON__</script>
+<script>
+const report=JSON.parse(document.getElementById('data').textContent),$=id=>document.getElementById(id);
+const money=n=>new Intl.NumberFormat('de-DE').format(n)+' SEK';
+$('max').value=report.config.max_price;
+$('stamp').textContent=(report.mode==='import'?'HTML-Import erstellt: ':'Suchdaten abgerufen: ')+new Date(report.search_fetched_at||report.generated_at).toLocaleString('de-DE');
+$('warning').textContent=report.warnings.join(' ');
+$('diagnostics').textContent=report.scanned+' Anzeigen erfasst. Gesucht nach: '+report.config.queries.join(', ')+'. '+(report.config.all_categories?'Alle Kategorien.':'Kategorie Spelkonsoler; falsch kategorisierte Angebote können fehlen.')+'\n\n'+report.excluded.map(r=>r.title+' — '+r.reason).join('\n');
+function el(tag,text,cls){const e=document.createElement(tag);if(text)e.textContent=text;if(cls)e.className=cls;return e}
+function safeUrl(value,hosts){try{const u=new URL(value);return u.protocol==='https:'&&hosts.includes(u.hostname)?u.href:''}catch{return ''}}
+function draw(){
+ const query=$('query').value.toLocaleLowerCase();
+ const rows=report.listings.filter(r=>r.price<=Number($('max').value)&&(`${r.title} ${r.location}`.toLocaleLowerCase().includes(query))&&($('delivery').value==='all'||r[$('delivery').value]));
+ rows.sort((a,b)=>$('sort').value==='new'?Number(b.new)-Number(a.new)||a.price-b.price:$('sort').value==='drop'?b.price_drop-a.price_drop||a.price-b.price:a.price-b.price);
+ $('count').textContent=rows.length+' passende Angebote · '+report.scanned+' Anzeigen geprüft';$('cards').replaceChildren();
+ if(!rows.length)$('cards').append(el('p','Keine passenden Angebote in diesem Abruf. Preisgrenze in config.json ändern und Start.cmd erneut ausführen.'));
+ for(const r of rows){
+  const card=el('article',null,'card'),body=el('div',null,'body'),tags=el('div',null,'tags');
+  const imageUrl=safeUrl(r.image,['images.blocketcdn.se']);if(imageUrl){const img=el('img');img.src=imageUrl;img.alt=r.title;img.loading='lazy';card.append(img)}
+  if(r.price<=report.config.deal_price)tags.append(el('span','Unter Schnäppchen-Grenze','tag deal'));
+  if(r.new)tags.append(el('span','Neu entdeckt','tag'));
+  if(r.price_drop)tags.append(el('span','−'+money(r.price_drop),'tag deal'));
+  body.append(tags,el('h2',r.title),el('div',money(r.price),'price'),el('p',r.location+' · '+r.model,'muted'));
+  body.append(el('p',[r.shipping?(r.free_shipping?'Versand laut Anzeige kostenlos':'Versand möglich'):null,r.pickup?'Abholung Göteborg':null].filter(Boolean).join(' / ')));
+  if(r.shipping_source)body.append(el('small',r.shipping_source,'muted'));
+  body.append(el('small',r.detail_checked?'Beschreibung automatisch geprüft':'Beschreibung noch prüfen'));
+  if(r.notes.length)body.append(el('p',r.notes.join(' · '),'muted'));
+  if(r.description){const detail=el('details');detail.append(el('summary','Schwedische Beschreibung'),el('pre',r.description));body.append(detail)}
+  const url=safeUrl(r.url,['www.blocket.se']);if(url){const a=el('a','Anzeige auf Blocket öffnen ↗');a.href=url;a.target='_blank';a.rel='noopener noreferrer';body.append(a)}
+  card.append(body);$('cards').append(card);
+ }
+}
+for(const id of ['max','query','delivery','sort'])$(id).addEventListener('input',draw);draw();
+setInterval(()=>{if(document.visibilityState==='visible'&&document.activeElement===document.body)location.reload()},60000);
+</script></html>
