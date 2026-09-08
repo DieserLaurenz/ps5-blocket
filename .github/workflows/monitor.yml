@@ -9,6 +9,10 @@ on:
         description: 'Live suchen ohne Telegram-Nachrichten'
         type: boolean
         default: false
+      diagnose_ai:
+        description: 'Nur verfügbare Gemini-Modelle prüfen (keine Generierung)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -34,8 +38,11 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DRY_RUN: ${{ inputs.dry_run }}
+          DIAGNOSE_AI: ${{ inputs.diagnose_ai }}
         run: |
-          if [ "$DRY_RUN" = 'true' ]; then
+          if [ "$DIAGNOSE_AI" = 'true' ]; then
+            python3 monitor.py --diagnose-ai
+          elif [ "$DRY_RUN" = 'true' ]; then
             python3 monitor.py --dry-run
           else
             python3 monitor.py

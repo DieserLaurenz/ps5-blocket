@@ -174,8 +174,12 @@ def main():
     parser.add_argument('--config', type=Path, default=scraper.ROOT / 'config.json')
     parser.add_argument('--state', type=Path, default=scraper.ROOT / 'output' / 'notifications.json')
     parser.add_argument('--test-telegram', action='store_true')
+    parser.add_argument('--diagnose-ai', action='store_true', help='Verfügbare Gemini-Modelle auflisten, ohne Generierung')
     args = parser.parse_args()
     try:
+        if args.diagnose_ai:
+            evaluator.diagnose_models(os.environ.get('GEMINI_API_KEY', ''))
+            return 0
         config = json.loads(args.config.read_text(encoding='utf-8-sig'))
         telegram = None if args.dry_run else Telegram(os.environ.get('TELEGRAM_BOT_TOKEN'), os.environ.get('TELEGRAM_CHAT_ID'))
         if args.test_telegram:
@@ -188,7 +192,7 @@ def main():
                  if os.environ.get('GITHUB_ACTIONS') == 'true' and not args.dry_run else LocalStore(args.state))
         execute(config, store, telegram, args.dry_run)
         return 0
-    except (ServiceError, scraper.ScrapeError, ValueError, OSError, KeyError, TypeError) as exc:
+    except (ServiceError, scraper.ScrapeError, evaluator.AIError, ValueError, OSError, KeyError, TypeError) as exc:
         # ServiceError and ScrapeError are sanitized; other failures contain local data only.
         print(f'Monitor fehlgeschlagen: {exc}', file=sys.stderr)
         return 1

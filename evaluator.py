@@ -112,6 +112,21 @@ def generate(row, api_key):
         raise AIError('Antwortformat') from None
 
 
+def diagnose_models(api_key):
+    if not api_key:
+        raise AIError('Kein API-Key')
+    request = urllib.request.Request('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
+                                     headers={'x-goog-api-key': api_key})
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            data = json.load(response)
+        names = [m['name'] for m in data.get('models', []) if 'generateContent' in m.get('supportedGenerationMethods', [])
+                 and ('flash' in m.get('name', '') or 'lite' in m.get('name', ''))]
+        print(json.dumps({'supported_models': names}, indent=2))
+    except (urllib.error.URLError, OSError, ValueError, KeyError):
+        raise AIError('Modellabfrage fehlgeschlagen') from None
+
+
 def variant(title):
     text = scraper.normalized(title)
     generation = ('slim' if re.search(r'\bslim\b', text) else
