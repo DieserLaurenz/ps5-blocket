@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import scraper
+import evaluator
 
 
 class ServiceError(Exception):
@@ -75,22 +76,29 @@ class GitHubStore:
         self.headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json',
                         'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'PS5-Blocket-Monitor'}
         self.sha = None
+        self.document = None
 
     def load(self):
         # Branch and file are provisioned at deployment. Missing state is an error,
         # not a first run: this avoids silently resending every alert after data loss.
         data = request_json(self.base + '/contents/state.json?ref=monitor-state', headers=self.headers)
         self.sha = data['sha']
-        return json.loads(base64.b64decode(data['content']))
+        state = json.loads(base64.b64decode(data['content']))
+        self.document = json.dumps(state, indent=2)
+        return state
 
     def save(self, state):
         if not self.sha:
             raise ServiceError('Statusdatei wurde nicht geladen.')
+        document = json.dumps(state, indent=2)
+        if document == self.document:
+            return
         result = request_json(self.base + '/contents/state.json', headers=self.headers, method='PUT', data={
             'message': 'Update monitor notification state', 'branch': 'monitor-state', 'sha': self.sha,
-            'content': base64.b64encode(json.dumps(state, indent=2).encode()).decode(),
+            'content': base64.b64encode(document.encode()).decode(),
         })
         self.sha = result['content']['sha']
+        self.document = document
 
 
 def prepare_state(state, recipient):
@@ -103,12 +111,13 @@ def prepare_state(state, recipient):
     return state
 
 
-def message_for(row, old_price=None):
-    label = 'Neue passende PS5' if old_price is None else f'PS5 günstiger: −{old_price - row["price"]:g} SEK'
+def message_for(row, old_price=None, assessment_update=False):
+    label = ('PS5: Bewertung aktualisiert' if assessment_update else
+             'Neue passende PS5' if old_price is None else f'PS5 günstiger: −{old_price - row["price"]:g} SEK')
     delivery = 'Versand möglich' if row['shipping'] else 'Abholung in Göteborg'
     return (f'{label}\n\n{row["title"][:300]}\n'
             f'{row["price"]:g} SEK · {row["location"]}\n{delivery}\n'
-            'Preis ggf. zzgl. Versand/Käuferschutz. Zustand und Lieferumfang prüfen.\n\n' + row['url'])
+            'Preis ggf. zzgl. Versand/Käuferschutz. Zustand und Lieferumfang prüfen.\n\n' + row['url'] + evaluator.assessment_text(row))
 
 
 def notify_rows(rows, state, store, telegram, now):
@@ -117,10 +126,13 @@ def notify_rows(rows, state, store, telegram, now):
         previous = state['notified'].get(row['id'])
         old_price = previous['price'] if previous else None
         # Only a new low since the last alert, not every temporary up/down fluctuation.
-        if old_price is not None and row['price'] >= old_price:
+        assessment_update = bool(row.get('assessment_id') and previous
+                                 and previous.get('assessment_id') != row['assessment_id'])
+        if old_price is not None and row['price'] >= old_price and not assessment_update:
             continue
-        telegram.send(message_for(row, old_price))
-        state['notified'][row['id']] = {'price': row['price'], 'sent_at': now}
+        telegram.send(message_for(row, old_price, assessment_update and row['price'] >= old_price))
+        state['notified'][row['id']] = {'price': min(row['price'], old_price) if old_price is not None else row['price'],
+                                      'sent_at': now, 'assessment_id': row.get('assessment_id')}
         store.save(state)  # Persist each confirmed send, also before a later send fails.
         sent += 1
         time.sleep(1)
@@ -132,9 +144,12 @@ def execute(config, store, telegram, dry_run=False):
     client = scraper.Client(config['request_delay'])
     docs, urls, warnings = scraper.collect(config, client)
     rows, excluded = scraper.select(docs, config, client)
+    # Assessment can add information, but never removes a qualifying listing.
+    evaluator.enrich(rows, config, state, store.save, client, dry_run=dry_run)
     now = datetime.now(timezone.utc).isoformat(timespec='seconds')
     result = {'at': now, 'scanned': len(docs), 'matches': len(rows), 'pages': len(urls),
-              'excluded': len(excluded), 'warnings': warnings, 'sent': 0}
+              'excluded': len(excluded), 'warnings': warnings, 'sent': 0,
+              'ai': [row.get('ai_status', 'disabled') for row in rows]}
     if dry_run:
         result['preview'] = [message_for(row) for row in rows]
     else:

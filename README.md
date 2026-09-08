@@ -2,6 +2,8 @@
 
 Der Remote-Suchdienst läuft über [GitHub Actions](https://github.com/DieserLaurenz/ps5-blocket/actions/workflows/monitor.yml) mit einem Fünf-Minuten-Zeitplan und Telegram-Benachrichtigungen. Neue passende Anzeigen, neue Tiefpreise und eine tägliche Statusmeldung gehen an den verbundenen Bot-Chat. Einrichtung, Kostenrahmen und Bedienung: [REMOTE.md](REMOTE.md).
 
+Telegram-Angebote enthalten zusätzlich eine deutsche KI-Textauswertung und, sofern genügend vergleichbare Angebote vorliegen, einen berechneten Preisvergleich. Einrichtung mit `Setup-KI.cmd`; der Scraper meldet Angebote auch ohne verfügbare KI weiter. Bewertungen werden gespeichert und nur bei Textänderungen erneut erzeugt.
+
 Lokaler Scraper für Windows und Python 3.10+. Keine zusätzlichen Pakete, kein Konto oder API-Schlüssel nötig.
 
 `Start.cmd` doppelklicken: sucht aktuell und öffnet `output/angebote.html` im Browser.

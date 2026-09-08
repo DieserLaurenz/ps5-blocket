@@ -226,6 +226,8 @@ class Client:
 
 def search_url(config, query, page):
     params = {'q': query, 'sort': 'PRICE_ASC', 'price_to': config['max_price'], 'page': page}
+    if config.get('min_price'):
+        params['price_from'] = config['min_price']
     if not config['all_categories']:
         params['product_category'] = '2.93.3905.63'
     return SEARCH + '?' + urllib.parse.urlencode(params)
