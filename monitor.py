@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+from html import escape
 import json
 import os
 import sys
@@ -46,10 +47,11 @@ class Telegram:
     def recipient(self):
         return hashlib.sha256((self.token.split(':')[0] + ':' + self.chat_id).encode()).hexdigest()[:20]
 
-    def send(self, text):
+    def send(self, text, *, html=False):
         result = request_json(f'https://api.telegram.org/bot{self.token}/sendMessage', data={
             'chat_id': self.chat_id, 'text': text,
             'link_preview_options': {'is_disabled': True},
+            **({'parse_mode': 'HTML'} if html else {}),
         })
         if result.get('ok') is not True:
             raise ServiceError('Telegram hat die Nachricht nicht bestätigt.')
@@ -111,13 +113,32 @@ def prepare_state(state, recipient):
     return state
 
 
-def message_for(row, old_price=None, assessment_update=False):
-    label = ('PS5: Bewertung aktualisiert' if assessment_update else
-             'Neue passende PS5' if old_price is None else f'PS5 günstiger: −{old_price - row["price"]:g} SEK')
-    delivery = 'Versand möglich' if row['shipping'] else 'Abholung in Göteborg'
-    return (f'{label}\n\n{row["title"][:300]}\n'
-            f'{row["price"]:g} SEK · {row["location"]}\n{delivery}\n'
-            'Preis ggf. zzgl. Versand/Käuferschutz. Zustand und Lieferumfang prüfen.\n\n' + row['url'] + evaluator.assessment_text(row))
+def message_for(row, old_price=None, assessment_update=False, preview=False):
+    """Trusted HTML layout; seller/model text is always bounded then escaped."""
+    label = ('👀 Formatvorschau · aktuelles Angebot' if preview else
+             '🧠 PS5 · Bewertung aktualisiert' if assessment_update else
+             '🎮 Neue passende PS5' if old_price is None else f'📉 PS5 günstiger: −{old_price - row["price"]:g} SEK')
+    analysis = row.get('analysis') or {}
+    inferred_generation, inferred_edition = evaluator.variant(row['title'])
+    generation = analysis.get('generation', inferred_generation)
+    edition = analysis.get('edition', inferred_edition)
+    model = {'original': 'PS5 Original', 'slim': 'PS5 Slim', 'pro': 'PS5 Pro'}.get(generation, 'PS5 · Version unklar')
+    model += ' · ' + {'disc': 'Disc', 'digital': 'Digital'}.get(edition, 'Edition unklar')
+    condition = {'new': 'Neu laut Anzeige', 'used': 'Gebraucht laut Anzeige',
+                 'faulty': 'Defekt laut Anzeige'}.get(analysis.get('condition'), 'Zustand unklar')
+    delivery = '🚚 <b>Versand möglich</b>' if row['shipping'] else '🤝 <b>Abholung in Göteborg</b>'
+    # Construct the link from the listing ID, not seller/LLM-provided markup or URLs.
+    identifier = str(row['id'])
+    if not identifier.isascii() or not identifier.isdecimal():
+        raise ValueError('Ungültige Blocket-Anzeigen-ID')
+    price = f'{row["price"]:,g}'.replace(',', '_').replace('.', ',').replace('_', '.')
+    return (f'<b>{label}</b>\n\n<b>{escape(row["title"][:300])}</b>\n'
+            f'💰 <b>{price} SEK</b>\n'
+            f'🕹 {model}\n🔎 {condition}\n'
+            f'📍 {escape(row["location"][:100])}\n{delivery}\n'
+            '<i>Ggf. zzgl. Versand und Käuferschutz.</i>'
+            + evaluator.assessment_text(row)
+            + f'\n\n🔗 <a href="https://www.blocket.se/recommerce/forsale/item/{identifier}">Anzeige auf Blocket öffnen</a>')
 
 
 def notify_rows(rows, state, store, telegram, now):
@@ -130,7 +151,7 @@ def notify_rows(rows, state, store, telegram, now):
                                  and previous.get('assessment_id') != row['assessment_id'])
         if old_price is not None and row['price'] >= old_price and not assessment_update:
             continue
-        telegram.send(message_for(row, old_price, assessment_update and row['price'] >= old_price))
+        telegram.send(message_for(row, old_price, assessment_update and row['price'] >= old_price), html=True)
         state['notified'][row['id']] = {'price': min(row['price'], old_price) if old_price is not None else row['price'],
                                       'sent_at': now, 'assessment_id': row.get('assessment_id')}
         store.save(state)  # Persist each confirmed send, also before a later send fails.
@@ -139,7 +160,7 @@ def notify_rows(rows, state, store, telegram, now):
     return sent
 
 
-def execute(config, store, telegram, dry_run=False):
+def execute(config, store, telegram, dry_run=False, preview_format=False):
     state = prepare_state(store.load(), telegram.recipient) if not dry_run else {}
     client = scraper.Client(config['request_delay'])
     docs, urls, warnings = scraper.collect(config, client)
@@ -152,15 +173,23 @@ def execute(config, store, telegram, dry_run=False):
               'ai': [row.get('ai_status', 'disabled') for row in rows]}
     if dry_run:
         result['preview'] = [message_for(row) for row in rows]
+    elif preview_format:
+        # A manual preview must not reset or consume the normal alert history.
+        if rows:
+            telegram.send(message_for(rows[0], preview=True), html=True)
+            result['sent'] = 1
+        result['format_preview'] = True
     else:
         result['sent'] = notify_rows(rows, state, store, telegram, now)
         # A daily health message confirms continued operation even without any deals.
         day = now[:10]
         if state.get('last_health_day') != day:
             qualifier = 'Suche unvollständig: Seitenlimit erreicht.' if warnings else 'Suche abgeschlossen.'
-            telegram.send(f'PS5-Suche aktiv · {len(rows)} passende Angebote bis {config["max_price"]} SEK.\n'
-                          f'{qualifier}\nZeitplan: alle 5 Minuten (GitHub kann Läufe verzögern).\n'
-                          'Versand in Schweden oder Abholung Göteborg. Nächste Statusmeldung morgen.')
+            telegram.send(f'✅ <b>PS5-Suche aktiv</b>\n\n'
+                          f'🎮 <b>{len(rows)} passende Angebote</b> bis {config["max_price"]:g} SEK\n'
+                          f'{qualifier}\n\n⏱ Zeitplan: alle 5 Minuten (Verzögerungen durch GitHub möglich).\n'
+                          '🚚 Versand in Schweden · 🤝 Abholung Göteborg\n'
+                          '<i>Nächste Statusmeldung morgen.</i>', html=True)
             state['last_health_day'] = day
             state['last_health_at'] = now
             store.save(state)
@@ -174,6 +203,7 @@ def main():
     parser.add_argument('--config', type=Path, default=scraper.ROOT / 'config.json')
     parser.add_argument('--state', type=Path, default=scraper.ROOT / 'output' / 'notifications.json')
     parser.add_argument('--test-telegram', action='store_true')
+    parser.add_argument('--preview-format', action='store_true', help='Ein aktuelles Angebot als Telegram-Formatvorschau senden')
     parser.add_argument('--diagnose-ai', action='store_true', help='Verfügbare Gemini-Modelle auflisten, ohne Generierung')
     args = parser.parse_args()
     try:
@@ -190,7 +220,7 @@ def main():
             return 0
         store = (GitHubStore(os.environ.get('GITHUB_REPOSITORY'), os.environ.get('GITHUB_TOKEN'))
                  if os.environ.get('GITHUB_ACTIONS') == 'true' and not args.dry_run else LocalStore(args.state))
-        execute(config, store, telegram, args.dry_run)
+        execute(config, store, telegram, args.dry_run, args.preview_format)
         return 0
     except (ServiceError, scraper.ScrapeError, evaluator.AIError, ValueError, OSError, KeyError, TypeError) as exc:
         # ServiceError and ScrapeError are sanitized; other failures contain local data only.

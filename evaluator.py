@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+from html import escape
 import json
 import os
 import re
@@ -257,22 +258,28 @@ def enrich(rows, config, state, save, client, *, api_key=None, now=None, dry_run
 
 
 def assessment_text(row):
+    """Telegram HTML, with limits applied before escaping (never cut tags)."""
     analysis, comparison = row.get('analysis'), row.get('price_comparison')
     if not analysis and not comparison:
         return ''
-    parts = ['\n\nEinschätzung']
+    parts = []
     if comparison:
-        parts.append(comparison['label'])
+        parts.append('\n\n📊 <b>Preisvergleich</b>')
+        parts.append(escape(comparison['label'][:180]))
         if 'median' in comparison:
-            parts.append(f"{comparison['percent']:+d}% zum Median von {comparison['count']} Anzeigen ({comparison['median']:g} SEK; {comparison['variant']}).")
-            parts.append('Angebotspreise, keine Verkaufspreise; Zustand/Zubehör können abweichen.')
+            parts.append(f"<b>{comparison['percent']:+d}%</b> zum Median: {comparison['median']:g} SEK · {comparison['count']} Anzeigen")
+            parts.append('<i>Angebotspreise, keine Verkaufspreise; Zustand/Zubehör können abweichen.</i>')
     if analysis:
-        parts.append(analysis['summary'])
-        for field, label in [('included', 'Dabei laut Anzeige'), ('positives', 'Pluspunkte'),
-                             ('warnings', 'Prüfen'), ('questions', 'Nachfragen')]:
+        parts.append('\n🧠 <b>KI-Einschätzung</b>')
+        parts.append(escape(analysis['summary'][:180]))
+        for field, label in [('included', '📦 Dabei laut Anzeige'), ('positives', '✅ Pluspunkte'),
+                             ('warnings', '⚠️ Offene Punkte / prüfen'), ('questions', '❓ Beim Verkäufer nachfragen')]:
             if analysis[field]:
-                parts.append(label + ': ' + '; '.join(analysis[field]))
-        parts.append('KI-Textauswertung, keine Bestätigung von Zustand oder Seriosität.')
+                parts.append(f'\n<b>{label}</b>')
+                parts.extend('• ' + escape(item[:120]) for item in analysis[field][:2 if field == 'questions' else 3])
+        if not analysis['included']:
+            parts.append('\n📦 <b>Lieferumfang:</b> keine eindeutigen Angaben')
+        parts.append('\n<i>KI wertet nur Anzeigentext aus. Zustand und Seriosität nicht bestätigt.</i>')
     else:
-        parts.append(row.get('ai_status', 'KI-Bewertung nicht verfügbar'))
-    return '\n'.join(parts)[:2400]
+        parts.append('\n🧠 ' + escape(row.get('ai_status', 'KI-Bewertung nicht verfügbar')[:250]))
+    return '\n'.join(parts)

@@ -4,6 +4,8 @@ Der Remote-Suchdienst läuft über [GitHub Actions](https://github.com/DieserLau
 
 Telegram-Angebote enthalten zusätzlich eine deutsche KI-Textauswertung und, sofern genügend vergleichbare Angebote vorliegen, einen berechneten Preisvergleich. Einrichtung mit `Setup-KI.cmd`; der Scraper meldet Angebote auch ohne verfügbare KI weiter. Bewertungen werden gespeichert und nur bei Textänderungen erneut erzeugt.
 
+Telegram-Meldungen zeigen Preis und Überschriften fett sowie Modell, Zustand, Versand/Abholung und Standort mit Emojis. Lieferumfang, offene Punkte und Nachfragen stehen in separaten Abschnitten; unbekannte Angaben werden ausdrücklich markiert. Über „Run workflow“ → `preview_format` lässt sich ein aktueller Treffer als Formatvorschau senden, ohne die normale Benachrichtigungshistorie zu verändern.
+
 Lokaler Scraper für Windows und Python 3.10+. Keine zusätzlichen Pakete, kein Konto oder API-Schlüssel nötig.
 
 `Start.cmd` doppelklicken: sucht aktuell und öffnet `output/angebote.html` im Browser.
