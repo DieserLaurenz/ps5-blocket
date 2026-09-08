@@ -21,7 +21,7 @@ Bei BotFather `/newbot` verwenden, wenn du noch keinen eigenen Bot hast. BotFath
 
 ## Angebotsbewertung
 
-`Setup-KI.cmd` verbindet einen [Gemini-API-Key](https://aistudio.google.com/api-keys) als GitHub-Secret `GEMINI_API_KEY`. Für kostenlosen Betrieb einen Free-Tier-Schlüssel aus einem Projekt ohne aktivierte Abrechnung verwenden. Das Setup aktiviert keine Abrechnung. Der Key wird verdeckt eingegeben, nicht lokal gespeichert und nicht als Kommandozeilenargument übergeben. Gemini 2.5 Flash-Lite bietet derzeit einen [Free Tier](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite); verfügbare Kontingente sind projektspezifisch und können sich ändern.
+`Setup-KI.cmd` verbindet einen [Gemini-API-Key](https://aistudio.google.com/api-keys) als GitHub-Secret `GEMINI_API_KEY`. Für kostenlosen Betrieb einen Free-Tier-Schlüssel aus einem Projekt ohne aktivierte Abrechnung verwenden. Das Setup aktiviert keine Abrechnung. Der Key wird verdeckt eingegeben, nicht lokal gespeichert und nicht als Kommandozeilenargument übergeben. Gemini 3.1 Flash-Lite bietet derzeit einen [Free Tier](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.1-flash-lite); verfügbare Kontingente sind projektspezifisch und können sich ändern.
 
 Das Modell erhält nur den gekürzten Titel und Beschreibungstext. Erkennbare URLs, E-Mail-Adressen und Telefonnummern werden vorher entfernt. Keine Verkäuferprofile, Bilder, Chat-Nachrichten oder Telegram-Zugangsdaten werden an Google gesendet. Es extrahiert Modellvariante, Lieferumfang, genannte Mängel, Informationslücken und Nachfragen auf Deutsch. Verkäuferangaben sind nicht verifiziert; KI-Ergebnisse können Fehler enthalten. Es gibt keinen automatischen Kauf und keine vom Modell aufrufbaren Tools.
 

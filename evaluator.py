@@ -6,6 +6,7 @@ import json
 import os
 import re
 import statistics
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -13,7 +14,7 @@ from datetime import datetime, timezone
 
 import scraper
 
-MODEL = 'gemini-2.5-flash-lite'
+MODEL = 'gemini-3.1-flash-lite'
 PROMPT_VERSION = 1
 GENERATIONS = ['original', 'slim', 'pro', 'unknown']
 EDITIONS = ['disc', 'digital', 'unknown']
@@ -105,6 +106,11 @@ def generate(row, api_key):
         text = ''.join(p.get('text', '') for p in candidate['content']['parts'] if not p.get('thought'))
         return validate_analysis(json.loads(text))
     except urllib.error.HTTPError as exc:
+        try:
+            detail = str(json.load(exc).get('error', {}).get('message', '')).replace(api_key, '[redacted]')
+            print('Gemini HTTP ' + str(exc.code) + ': ' + clean_text(detail, 250), file=sys.stderr)
+        except (ValueError, AttributeError, TypeError):
+            pass
         raise AIError(str(exc.code)) from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise AIError('Netzwerk') from None
@@ -210,7 +216,7 @@ def enrich(rows, config, state, save, client, *, api_key=None, now=None, dry_run
             row['ai_status'] = 'cached'
         else:
             can_call = bool(api_key) and not dry_run
-            if budget.get('blocked_until', 0) > now:
+            if budget.get('blocked_model') == MODEL and budget.get('blocked_until', 0) > now:
                 can_call, reason = False, 'KI-Kontingent oder Dienst derzeit nicht verfügbar'
             if entry.get('fingerprint') == digest and entry.get('retry_after', 0) > now:
                 can_call, reason = False, 'KI-Auswertung wird später erneut versucht'
@@ -226,6 +232,7 @@ def enrich(rows, config, state, save, client, *, api_key=None, now=None, dry_run
                     reason = str(exc)
                     cache[row['id']] = {'fingerprint': digest, 'retry_after': now + 3600, 'created_at': now}
                     budget['blocked_until'] = now + (21600 if exc.status in ('429', '403', '401') else 900)
+                    budget['blocked_model'] = MODEL
                 else:
                     cache[row['id']] = {'fingerprint': digest, 'analysis': analysis, 'created_at': now}
                     row['analysis'], row['assessment_id'], row['ai_status'] = analysis, digest, 'new'

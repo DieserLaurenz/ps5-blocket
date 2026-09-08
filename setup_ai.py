@@ -4,6 +4,7 @@ import subprocess
 import sys
 import urllib.request
 import json
+from evaluator import MODEL
 
 REPO = 'DieserLaurenz/ps5-blocket'
 
@@ -15,7 +16,7 @@ def main():
     try:
         key = getpass.getpass('Gemini API-Key (unsichtbare Eingabe): ').strip()
         request = urllib.request.Request(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite',
+            'https://generativelanguage.googleapis.com/v1beta/models/' + MODEL,
             headers={'x-goog-api-key': key})
         with urllib.request.urlopen(request, timeout=30) as response:
             json.load(response)
