@@ -1,6 +1,6 @@
 # PS5 deals on Blocket
 
-The remote search service uses [GitHub Actions](https://github.com/DieserLaurenz/ps5-blocket/actions/workflows/monitor.yml) with a five-minute schedule and Telegram notifications. New matching listings, new price lows and a daily status message go to the connected bot chat. A configured schedule is not proof of automatic execution: check for `schedule` events in the run history. Setup, costs and controls: [REMOTE.md](REMOTE.md).
+The remote search service runs on [GitHub Actions](https://github.com/DieserLaurenz/ps5-blocket/actions/workflows/monitor.yml), triggered every five minutes by an external cron-job.org job. New matching listings, new price lows and a daily status message go to the connected Telegram chat. External triggers appear as `workflow_dispatch`, just like manual tests; verify recurrence using cron-job.org execution history and GitHub run timestamps. Setup, costs and controls: [REMOTE.md](REMOTE.md).
 
 Telegram offers include an English AI text assessment and, when enough comparable listings are available, a calculated price comparison. Run `Setup-AI.cmd` to configure AI; `Setup-KI.cmd` remains a compatibility shortcut. The scraper continues sending matching listings when AI is unavailable. Assessments are cached and regenerated when the listing text or assessment prompt changes.
 

@@ -1,8 +1,7 @@
 name: PS5 Search
 
 on:
-  schedule:
-    - cron: '3,8,13,18,23,28,33,38,43,48,53,58 * * * *'
+  # cron-job.org sends this dispatch every five minutes; no second built-in timer.
   workflow_dispatch:
     inputs:
       dry_run:

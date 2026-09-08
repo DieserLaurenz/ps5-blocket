@@ -4,13 +4,13 @@ Repository: https://github.com/DieserLaurenz/ps5-blocket
 
 ## Enable
 
-Double-click `Setup-Telegram.cmd` on your PC. The wizard reads the bot token through hidden input, verifies it and displays a one-time connection message. Send that message in a private chat with your bot to identify the correct chat ID. It then stores both values as GitHub Actions secrets, sends a test message, enables the schedule and starts a search immediately. The token is not saved locally or placed in command-line arguments or the repository.
+Double-click `Setup-Telegram.cmd` on your PC. The wizard reads the bot token through hidden input, verifies it and displays a one-time connection message. Send that message in a private chat with your bot to identify the correct chat ID. It then stores both values as GitHub Actions secrets, sends a test message, enables the workflow and starts a search immediately. Recurring execution is configured separately on cron-job.org as described below. The token is not saved locally or placed in command-line arguments or the repository.
 
 Use `/newbot` with BotFather if you do not have a bot yet. BotFather manages bots; use a separate bot without an active webhook for this project. Alternatively, manually create repository secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and repository variable `PS5_MONITOR_ENABLED=true`.
 
 ## Behaviour
 
-- Schedule: `3,8,13,18,23,28,33,38,43,48,53,58 * * * *` — minutes 3, 8, 13, etc., around the clock. Check the Actions history for automatic `schedule` events; successful manual runs alone do not verify the scheduler.
+- Schedule: an external cron-job.org job triggers the workflow every five minutes, around the clock. GitHub's built-in `schedule` trigger is removed to avoid duplicate searches. External triggers appear as `workflow_dispatch`; correlate cron-job.org history with GitHub run timestamps to distinguish them from manual tests.
 - Each run searches both terms across all categories up to 4,000 SEK. Shipping within Sweden or pickup in Göteborg; settings are in `config.json`.
 - The first run sends one message per matching console. Later runs alert on new listings or prices below the lowest previously alerted price. A price going up and back down does not trigger a duplicate.
 - A daily status message confirms a successful search. If it stops arriving, check the Actions page.
@@ -36,14 +36,37 @@ Efficiency: cache keys include title/description, model and prompt version; pric
 
 Standard GitHub-hosted runners in public repositories are [free](https://docs.github.com/en/billing/concepts/product-billing/github-actions). This workflow skips jobs in private repositories. Telegram bot messages at this volume are [free](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this).
 
-GitHub [does not guarantee an exact five-minute interval](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule): runs can start late or be dropped. Public schedules may be disabled after 60 days without repository activity. This is not a permanent hosting guarantee; platform terms apply. Cron on an existing server offers more control over timing but requires hardware/hosting.
+The external timer replaces GitHub's built-in scheduler, not its runners. Requests and queued workflow starts can still be delayed. cron-job.org is [free but does not guarantee exact timing](https://cron-job.org/en/faq/); platform terms apply. A successful trigger response only confirms that GitHub accepted the request, not that the scraper completed. Check Actions results and the daily Telegram status too.
+
+## External cron setup
+
+Create a fine-grained GitHub token restricted to `DieserLaurenz/ps5-blocket` with **Actions: read and write** permission. Give it an expiry date and a renewal reminder. Do not use a broad account token or share the token in chat, screenshots, source files or URL parameters.
+
+On cron-job.org, create an enabled job with an **every five minutes** schedule and the following request:
+
+```text
+POST https://api.github.com/repos/DieserLaurenz/ps5-blocket/actions/workflows/monitor.yml/dispatches
+Authorization: Bearer YOUR_GITHUB_TOKEN
+Accept: application/vnd.github+json
+Content-Type: application/json
+X-GitHub-Api-Version: 2026-03-10
+```
+
+Request body:
+
+```json
+{"ref":"main"}
+```
+
+The scheduler stores this restricted GitHub token; Telegram and Gemini keys stay in GitHub secrets. Enable failure notifications. When the token expires, replace it in the Authorization header. Test once, then verify recurring runs without clicking Test run again. An expired token, disabled cron job or failed trigger requires checking cron-job.org, not just GitHub's run history.
 
 ## Controls
 
 - Search now: GitHub → Actions → PS5 Search → Run workflow.
 - Test without messages: enable `dry_run`.
 - Preview formatting: enable `preview_format` to send one current listing without changing alert history.
-- Disable: Actions → PS5 Search → menu → Disable workflow, or set `PS5_MONITOR_ENABLED=false`.
+- Pause recurring searches: disable the cron-job.org job. To stop all new workflow runs, also use Actions → PS5 Search → menu → Disable workflow. Keep the workflow enabled during normal external scheduling.
+- `PS5_MONITOR_ENABLED=false` does not block `workflow_dispatch` requests and is not a pause switch for the external cron job.
 - Change filters: edit `config.json` on branch `main`.
 - Change Telegram token: run `Setup-Telegram.cmd` again.
 - Without GitHub, on an existing Linux server: set secrets as environment variables and schedule `*/5 * * * * flock -n /tmp/ps5-blocket.lock /usr/bin/python3 /path/ps5-blocket/monitor.py` with cron. Local notification state is stored in `output/notifications.json`.
