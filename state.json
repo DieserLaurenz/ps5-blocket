@@ -184,6 +184,32 @@
         "confidence": "medium"
       },
       "created_at": 1788900696.310418
+    },
+    "26458731": {
+      "fingerprint": "f138067f95ee5a2e5711777547d73e492f0f1e95321fc2e9c88abcc3072aa1f4",
+      "analysis": {
+        "generation": "unknown",
+        "edition": "unknown",
+        "condition": "unknown",
+        "summary": "The listing describes a white PS5 console with one controller. The description is incomplete and lacks details on the edition, generation, and overall condition.",
+        "included": [
+          "PS5 console",
+          "1 DualSense controller"
+        ],
+        "positives": [],
+        "warnings": [
+          "Description is incomplete",
+          "Edition (disc/digital) is not specified",
+          "Generation (original/slim/pro) is not specified"
+        ],
+        "questions": [
+          "Is this the disc or digital edition?",
+          "Which generation is this console (original or slim)?"
+        ],
+        "seller_message_sv": "Hej! \u00c4r detta disc- eller digital-versionen? Vilken generation \u00e4r konsolen (original eller slim)? Tack!",
+        "confidence": "low"
+      },
+      "created_at": 1788972396.7909381
     }
   },
   "ai_budget": {
