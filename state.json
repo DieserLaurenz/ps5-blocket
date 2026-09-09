@@ -25,8 +25,8 @@
   "last_health_day": "2026-09-09",
   "last_health_at": "2026-09-09T00:01:52+00:00",
   "market": {
-    "attempted_at": 1788921991.1364024,
-    "fetched_at": 1788921991.1364024,
+    "attempted_at": 1788943594.6630747,
+    "fetched_at": 1788943594.6630747,
     "max_price": 10000,
     "truncated": false,
     "samples": [
