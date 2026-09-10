@@ -35,6 +35,20 @@
       ],
       "photos_sent": 5,
       "photo_failures": 0
+    },
+    "26467437": {
+      "price": 3250,
+      "sent_at": "2026-09-10T06:56:33+00:00",
+      "assessment_id": "0b7850da26db690fe83efdf94431e0975bae84a19539f0c3152fe567e36dee13",
+      "message_id": 37,
+      "photo_urls": [
+        "https://images.blocketcdn.se/dynamic/960w/item/26467437/3cd628f2-358d-4872-919e-23d67e534691",
+        "https://images.blocketcdn.se/dynamic/960w/item/26467437/24ee0631-9d98-480d-972c-2f489a1774e2",
+        "https://images.blocketcdn.se/dynamic/960w/item/26467437/8b405f7a-0376-493d-ac4b-6baeb5f42f9f",
+        "https://images.blocketcdn.se/dynamic/960w/item/26467437/475886af-5423-4eee-88dd-f32546716675",
+        "https://images.blocketcdn.se/dynamic/960w/item/26467437/6238666f-8221-44bd-a4da-e6ab0680a9df"
+      ],
+      "photos_sent": 0
     }
   },
   "last_health_day": "2026-09-10",
