@@ -215,6 +215,30 @@
         "confidence": "low"
       },
       "created_at": 1788975391.6288884
+    },
+    "26467437": {
+      "fingerprint": "0b7850da26db690fe83efdf94431e0975bae84a19539f0c3152fe567e36dee13",
+      "analysis": {
+        "generation": "unknown",
+        "edition": "unknown",
+        "condition": "used",
+        "summary": "Used PS5 console with one controller. Generation and disc/digital edition are not specified. Controller has stick drift.",
+        "included": [
+          "Console",
+          "Controller"
+        ],
+        "positives": [],
+        "warnings": [
+          "Controller has stick drift"
+        ],
+        "questions": [
+          "Is this the disc or digital edition?",
+          "Which generation is the console (original, slim, or pro)?"
+        ],
+        "seller_message_sv": "Hej! \u00c4r detta disc- eller digital-versionen? Vilken generation \u00e4r konsolen (original, slim eller pro)? Tack!",
+        "confidence": "medium"
+      },
+      "created_at": 1789023389.5180042
     }
   },
   "ai_budget": {
