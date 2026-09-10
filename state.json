@@ -55,16 +55,28 @@
   "last_health_day": "2026-09-10",
   "last_health_at": "2026-09-10T00:06:33+00:00",
   "market": {
-    "attempted_at": 1789030590.8113747,
-    "fetched_at": 1789030590.8113747,
+    "attempted_at": 1789052192.427919,
+    "fetched_at": 1789052192.427919,
     "max_price": 10000,
     "truncated": false,
     "samples": [
+      {
+        "id": "26473104",
+        "price": 4000,
+        "generation": "slim",
+        "edition": "digital"
+      },
       {
         "id": "26007477",
         "price": 5699,
         "generation": "slim",
         "edition": "digital"
+      },
+      {
+        "id": "26477760",
+        "price": 6000,
+        "generation": "slim",
+        "edition": "disc"
       },
       {
         "id": "26383713",
@@ -77,6 +89,18 @@
         "price": 6200,
         "generation": "slim",
         "edition": "disc"
+      },
+      {
+        "id": "26476228",
+        "price": 6499,
+        "generation": "slim",
+        "edition": "digital"
+      },
+      {
+        "id": "26477913",
+        "price": 6550,
+        "generation": "slim",
+        "edition": "digital"
       },
       {
         "id": "26455164",
@@ -110,7 +134,7 @@
       },
       {
         "id": "26460560",
-        "price": 5800,
+        "price": 5600,
         "generation": "slim",
         "edition": "digital"
       },
@@ -119,6 +143,12 @@
         "price": 5999,
         "generation": "original",
         "edition": "disc"
+      },
+      {
+        "id": "26477047",
+        "price": 6200,
+        "generation": "slim",
+        "edition": "digital"
       },
       {
         "id": "24266095",
@@ -143,12 +173,6 @@
         "price": 6699,
         "generation": "slim",
         "edition": "digital"
-      },
-      {
-        "id": "25655273",
-        "price": 6700,
-        "generation": "slim",
-        "edition": "disc"
       },
       {
         "id": "24267178",
