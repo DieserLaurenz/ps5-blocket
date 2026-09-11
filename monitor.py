@@ -17,6 +17,7 @@ from pathlib import Path
 
 import scraper
 import evaluator
+import marketplaces
 
 
 class ServiceError(Exception):
@@ -150,30 +151,46 @@ def message_for(row, old_price=None, assessment_update=False, preview=False):
                  'faulty': 'Faulty according to seller'}.get(analysis.get('condition'), 'Condition unknown')
     delivery = '🚚 <b>Shipping available</b>' if row['shipping'] else '🤝 <b>Pickup in Göteborg</b>'
     # Construct the link from the listing ID, not seller/LLM-provided markup or URLs.
-    identifier = str(row['id'])
-    if not identifier.isascii() or not identifier.isdecimal():
-        raise ValueError('Invalid Blocket listing ID')
+    listing_url, source_name = marketplaces.url(row), marketplaces.name(row)
     price = f'{row["price"]:,g}'
     rating = row.get('seller_rating')
-    if rating:
+    if rating and row.get('source') == 'tradera':
+        reputation = (f'⭐ <b>Seller feedback: {rating["score"]:g}% positive</b> · '
+                      f'{rating["count"]} ratings · last 12 months on Tradera')
+    elif rating:
         scale = f'/{rating["best"]:g}' if rating.get('best') is not None else ' (scale not listed)'
         reputation = f'⭐ <b>Seller rating: {rating["score"]:g}{scale}</b> · {rating["count"]} reviews on Blocket'
     else:
         reputation = '⭐ Seller rating: unavailable publicly' if row.get('photos_checked') else '⭐ Seller rating: not checked'
-    photos = scraper.photo_urls(row.get('photos') or [row.get('image')], row['id'])
+    photos = marketplaces.photos(row)
     photo_note = (f'📷 {len(photos)} listing photos' if row.get('photos_checked') else '📷 Cover photo only · gallery not checked') if photos else '📷 No public listing photos found'
-    return (f'<b>{label}</b>\n\n<b>{escape(row["title"][:300])}</b>\n'
-            f'💰 <b>{price} SEK</b>\n'
+    sale_note = ''
+    if row.get('sale_type') == 'auction':
+        sale_note = ('🔨 <b>Auction · minimum next bid, NOT final price</b>\n'
+                     f'⏳ Ends: {escape(row["ends_at"])} (UTC)\n')
+        if row.get('reserve_not_met'):
+            sale_note += '⚠️ Reserve price not met.\n'
+    elif row.get('sale_type') == 'fixed':
+        sale_note = '🏷 <b>Buy Now · fixed price</b>\n'
+    if row.get('shipping_cost') is not None:
+        sale_note += f'📦 Listed shipping from {row["shipping_cost"]:g} SEK extra\n'
+    return (f'<b>{label}</b> · {source_name}\n\n<b>{escape(row["title"][:300])}</b>\n'
+            f'💰 <b>{price} SEK</b>\n{sale_note}'
             f'🕹 {model}\n🔎 {condition}\n'
             f'📍 {escape(row["location"][:100])}\n{delivery}\n'
             f'{reputation}\n{photo_note}\n'
             '<i>Shipping and buyer protection may cost extra.</i>'
             + evaluator.assessment_text(row)
             + evaluator.seller_message_text(row)
-            + f'\n\n🔗 <a href="https://www.blocket.se/recommerce/forsale/item/{identifier}">View listing on Blocket</a>')
+            + f'\n\n🔗 <a href="{listing_url}">View listing on {source_name}</a>')
 
 
 def load_alert_extras(row, client):
+    if isinstance(client, dict):
+        provider = client.get(row.get('source', 'blocket'))
+        if provider is not None and (row.get('source') == 'tradera' or not row.get('photos_checked')):
+            provider.extras(row)
+        return
     if client is not None and not row.get('photos_checked'):
         extras = scraper.parse_listing_extras(client.get(row['url']), row['id'])
         extras['photos'] = extras['photos'] or row.get('photos', [])
@@ -182,14 +199,14 @@ def load_alert_extras(row, client):
 
 def deliver_photos(row, record, telegram, save):
     """Resume only unconfirmed batches; media failures never roll back the text alert."""
-    urls = scraper.photo_urls(record.get('photo_urls', []), row['id'])
+    urls = marketplaces.photos(row, record.get('photo_urls', []))
     if record.get('photo_failures', 0) >= 3 or record.get('photo_retry_after', 0) > time.time():
         return
     while record.get('photos_sent', 0) < len(urls):
         offset = record.get('photos_sent', 0)
         batch = urls[offset:offset + 10]
         caption = (f'📷 <b>{escape(row["title"][:200])}</b> · photos {offset + 1}–{offset + len(batch)}/{len(urls)}\n'
-                   f'https://www.blocket.se/recommerce/forsale/item/{row["id"]}')
+                   f'{marketplaces.url(row)}')
         try:
             telegram.send_photos(batch, caption, record.get('message_id'))
         except ServiceError:
@@ -208,8 +225,10 @@ def deliver_photos(row, record, telegram, save):
 
 def notify_rows(rows, state, store, telegram, now, client=None):
     sent = 0
+    client = dict(client) if isinstance(client, dict) else client
     for row in rows:
-        previous = state['notified'].get(row['id'])
+        listing_key = marketplaces.key(row)
+        previous = state['notified'].get(listing_key)
         old_price = previous['price'] if previous else None
         # Only a new low since the last alert, not every temporary up/down fluctuation.
         assessment_update = bool(row.get('assessment_id') and previous
@@ -220,17 +239,20 @@ def notify_rows(rows, state, store, telegram, now, client=None):
         try:
             load_alert_extras(row, client)
         except scraper.ScrapeError:
-            # Do not repeat optional requests after a Blocket access/network failure.
-            client = None
-            print('Optional gallery lookup failed; using available search metadata.', file=sys.stderr)
+            # Stop optional requests only for the source whose lookup failed.
+            if isinstance(client, dict):
+                client.pop(row.get('source', 'blocket'), None)
+            else:
+                client = None
+            print('Optional gallery/feedback lookup failed; using available listing metadata.', file=sys.stderr)
         message_id = telegram.send(message_for(row, old_price, assessment_update and row['price'] >= old_price), html=True)
-        state['notified'][row['id']] = {'price': min(row['price'], old_price) if old_price is not None else row['price'],
+        state['notified'][listing_key] = {'price': min(row['price'], old_price) if old_price is not None else row['price'],
                                       'sent_at': now, 'assessment_id': row.get('assessment_id'),
                                       'message_id': message_id,
-                                      'photo_urls': scraper.photo_urls(row.get('photos') or [row.get('image')], row['id']),
+                                      'photo_urls': marketplaces.photos(row),
                                       'photos_sent': 0}
         store.save(state)  # Persist each confirmed send, also before a later send fails.
-        deliver_photos(row, state['notified'][row['id']], telegram, lambda: store.save(state))
+        deliver_photos(row, state['notified'][listing_key], telegram, lambda: store.save(state))
         sent += 1
         time.sleep(1)
     return sent
@@ -238,35 +260,43 @@ def notify_rows(rows, state, store, telegram, now, client=None):
 
 def execute(config, store, telegram, dry_run=False, preview_format=False):
     state = prepare_state(store.load(), telegram.recipient) if not dry_run else {}
-    client = scraper.Client(config['request_delay'])
-    docs, urls, warnings = scraper.collect(config, client)
-    rows, excluded = scraper.select(docs, config, client)
+    rows, clients, statuses = marketplaces.search(config, state)
+    blocket_client = clients['blocket'].client if 'blocket' in clients else None
+    warnings = [source + ': ' + warning for source, status in statuses.items()
+                for warning in status.get('warnings', []) + ([status['error']] if 'error' in status else [])]
     # Assessment can add information, but never removes a qualifying listing.
-    evaluator.enrich(rows, config, state, store.save, client, dry_run=dry_run)
+    evaluator.enrich(rows, config, state, store.save, blocket_client, dry_run=dry_run)
     now = datetime.now(timezone.utc).isoformat(timespec='seconds')
-    result = {'at': now, 'scanned': len(docs), 'matches': len(rows), 'pages': len(urls),
-              'excluded': len(excluded), 'warnings': warnings, 'sent': 0,
+    result = {'at': now, 'scanned': sum(s.get('scanned', 0) for s in statuses.values()),
+              'matches': len(rows), 'pages': sum(s.get('pages', 0) for s in statuses.values()),
+              'excluded': sum(s.get('excluded', 0) for s in statuses.values()),
+              'sources': statuses, 'warnings': warnings, 'sent': 0,
               'ai': [row.get('ai_status', 'disabled') for row in rows]}
     if dry_run:
         result['preview'] = [message_for(row) for row in rows]
     elif preview_format:
         # A manual preview must not reset or consume the normal alert history.
         if rows:
-            load_alert_extras(rows[0], client)
+            try:
+                load_alert_extras(rows[0], clients)
+            except scraper.ScrapeError:
+                pass
             message_id = telegram.send(message_for(rows[0], preview=True), html=True)
             record = {'message_id': message_id, 'photo_urls': rows[0].get('photos', [])}
             deliver_photos(rows[0], record, telegram, lambda: None)
             result['sent'] = 1
         result['format_preview'] = True
     else:
-        result['sent'] = notify_rows(rows, state, store, telegram, now, client)
+        result['sent'] = notify_rows(rows, state, store, telegram, now, clients)
         # A daily health message confirms continued operation even without any deals.
         day = now[:10]
         if state.get('last_health_day') != day:
-            qualifier = 'Search incomplete: page limit reached.' if warnings else 'Search completed.'
+            qualifier = 'Search incomplete; see source status below.' if warnings else 'Search completed.'
+            source_status = '\n'.join(escape(source.capitalize() + ': ' + status['status'])
+                                      for source, status in statuses.items())
             telegram.send(f'✅ <b>PS5 search active</b>\n\n'
                           f'🎮 <b>{len(rows)} matching listings</b> up to {config["max_price"]:g} SEK\n'
-                          f'{qualifier}\n\n⏱ Scheduled every 5 minutes (GitHub delays are possible).\n'
+                          f'{qualifier}\n{source_status}\n\n⏱ Scheduled every 5 minutes (GitHub delays are possible).\n'
                           '🚚 Shipping within Sweden · 🤝 Pickup in Göteborg\n'
                           '<i>Next status update tomorrow.</i>', html=True)
             state['last_health_day'] = day

@@ -20,6 +20,14 @@ Use `/newbot` with BotFather if you do not have a bot yet. BotFather manages bot
 - No Actions artifacts or Actions caches are uploaded. State changes create commits; identical state does not.
 - Alerts, AI assessments, setup prompts and dashboard controls are in English. Original seller text is preserved. Old German AI assessments are regenerated under the normal API budget when their listings next qualify.
 
+## Optional Tradera source
+
+See [TRADERA.md](TRADERA.md) for developer-account setup, auction handling, coverage
+limits, and the independent `TRADERA_ENABLED` switch. Both sources run in the same
+workflow; no cron-job.org change is required. Source failures and partial coverage
+are listed in the run output and daily Telegram status. AI quotas are shared and
+existing Blocket notification history is preserved.
+
 ## Offer assessment
 
 `Setup-AI.cmd` (or the existing `Setup-KI.cmd` shortcut) stores a [Gemini API key](https://aistudio.google.com/api-keys) as GitHub secret `GEMINI_API_KEY`. For free operation, use a free-tier project without billing enabled. Setup does not enable billing. The key is entered invisibly, not stored locally and not passed as a command-line argument. See the [Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.1-flash-lite) for Gemini 3.1 Flash-Lite availability and free-tier terms; quotas vary by project and can change.

@@ -1,4 +1,9 @@
-# PS5 deals on Blocket
+# PS5 deals on Blocket and Tradera
+
+An optional, modular **Tradera** monitor shares the existing remote schedule,
+Telegram notifications and AI budget. It is disabled until you configure approved
+Tradera API credentials. See [TRADERA.md](TRADERA.md) and run `Setup-Tradera.cmd`.
+The local HTML dashboard remains Blocket-only.
 
 The remote search service runs on [GitHub Actions](https://github.com/DieserLaurenz/ps5-blocket/actions/workflows/monitor.yml), triggered every five minutes by an external cron-job.org job. New matching listings, new price lows and a daily status message go to the connected Telegram chat. External triggers appear as `workflow_dispatch`, just like manual tests; verify recurrence using cron-job.org execution history and GitHub run timestamps. Setup, costs and controls: [REMOTE.md](REMOTE.md).
 

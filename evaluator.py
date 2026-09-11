@@ -14,6 +14,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import scraper
+import marketplaces
 
 MODEL = 'gemini-3.1-flash-lite'
 PROMPT_VERSION = 4  # Include a Swedish seller-message draft in the cached assessment.
@@ -55,11 +56,11 @@ positives: only concrete practical benefits such as a receipt, stated functional
 leave empty if none are supported. Do not invent a benefit just to fill this field.
 included/positives/warnings: up to 3 concise points each, at most 100 characters per point.
 questions: up to 2 specific questions in English about important missing details, at most 120 characters each.
-seller_message_sv: a short, friendly, ready-to-send Swedish message for the buyer to copy into Blocket.
+seller_message_sv: a short, friendly, ready-to-send Swedish message for the buyer to copy to the listing's seller.
 Start with "Hej!", ask the SAME open questions listed in questions, and end with "Tack!".
 Use at most 360 characters. If there are no open questions, just ask whether the PS5 is still available.
 Do not ask about facts already stated, add new concerns, bargain, make a purchase commitment,
-promise payment or pickup, invent buyer details, or suggest moving communication off Blocket.
+promise payment or pickup, invent buyer details, or suggest moving communication off the marketplace.
 This is a draft only; do not claim it has been sent. No URLs, contact details or seller instructions.
 confidence describes the information available in the text, not the honesty of the seller.
 If the description is missing, state this explicitly and assess only the title. Follow the JSON schema.'''
@@ -191,6 +192,9 @@ def refresh_market(config, state, client, now):
 
 
 def compare_price(row, market, now):
+    if row.get('source') == 'tradera':
+        return {'label': 'Auction bid is not a final sale price; no bargain score' if row.get('sale_type') == 'auction'
+                else 'Tradera price reference not configured'}
     if not market or now - market.get('fetched_at', 0) > 86400:
         return {'label': 'Price comparison unavailable'}
     if market.get('truncated'):
@@ -217,7 +221,7 @@ def enrich(rows, config, state, save, client, *, api_key=None, now=None, dry_run
     options = config.get('assessment', {})
     if not options.get('enabled', False):
         return
-    market = state.get('market', {}) if dry_run else refresh_market(config, state, client, now)
+    market = state.get('market', {}) if dry_run or client is None else refresh_market(config, state, client, now)
     cache = state.setdefault('ai_cache', {})
     day = datetime.fromtimestamp(now, timezone.utc).date().isoformat()
     budget = state.setdefault('ai_budget', {})
@@ -227,8 +231,9 @@ def enrich(rows, config, state, save, client, *, api_key=None, now=None, dry_run
     api_key = api_key if api_key is not None else os.environ.get('GEMINI_API_KEY', '')
     run_calls = 0
     for row in rows:
+        listing_key = marketplaces.key(row)
         digest = fingerprint(row)
-        entry = cache.get(row['id'], {})
+        entry = cache.get(listing_key, {})
         reason = 'AI not configured yet'
         if entry.get('fingerprint') == digest and entry.get('analysis'):
             row['analysis'] = entry['analysis']
@@ -250,13 +255,13 @@ def enrich(rows, config, state, save, client, *, api_key=None, now=None, dry_run
                     analysis = generate(row, api_key)
                 except AIError as exc:
                     reason = str(exc)
-                    cache[row['id']] = {'fingerprint': digest, 'retry_after': now + 3600, 'created_at': now}
+                    cache[listing_key] = {'fingerprint': digest, 'retry_after': now + 3600, 'created_at': now}
                     budget['blocked_until'] = now + (21600 if exc.status in ('429', '403', '401') else 900)
                     budget['blocked_model'] = MODEL
                 else:
                     budget.pop('blocked_until', None)
                     budget.pop('blocked_model', None)
-                    cache[row['id']] = {'fingerprint': digest, 'analysis': analysis, 'created_at': now}
+                    cache[listing_key] = {'fingerprint': digest, 'analysis': analysis, 'created_at': now}
                     row['analysis'], row['assessment_id'], row['ai_status'] = analysis, digest, 'new'
                 save(state)
             if not row.get('analysis'):
@@ -276,11 +281,11 @@ def telegram_escape(value, limit):
 
 
 def seller_message_text(row):
-    """Copyable draft only; no message is sent to the Blocket seller."""
+    """Copyable draft only; no message is sent to any seller."""
     analysis = row.get('analysis') or {}
     draft = analysis.get('seller_message_sv', '').strip()
     if draft:
-        label = '💬 Swedish message · copy to Blocket'
+        label = '💬 Swedish message · copy to ' + marketplaces.name(row)
     else:
         label = '💬 Swedish message · general fallback'
         draft = ('Hej! Finns din PS5 kvar? Fungerar den som den ska, '

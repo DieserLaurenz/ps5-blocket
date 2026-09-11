@@ -7,6 +7,16 @@
   "request_delay": 2,
   "detail_limit": 12,
   "all_categories": true,
+  "sources": {
+    "blocket": {"enabled": true},
+    "tradera": {
+      "enabled": false,
+      "include_auctions": true,
+      "max_pages": 10,
+      "detail_limit": 24,
+      "request_delay": 1
+    }
+  },
   "assessment": {
     "enabled": true,
     "max_calls_per_run": 3,
