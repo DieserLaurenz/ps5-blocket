@@ -300,6 +300,33 @@
         "confidence": "medium"
       },
       "created_at": 1789305099.7464502
+    },
+    "26574676": {
+      "fingerprint": "800e7f41107073f5140264016e53e695003f37591a5c3fcaa9bb6b11103ebe1d",
+      "analysis": {
+        "generation": "unknown",
+        "edition": "unknown",
+        "condition": "used",
+        "summary": "Used PS5 console in good condition. Includes one black controller. Missing charging cable for the controller.",
+        "included": [
+          "PS5 console",
+          "Black controller"
+        ],
+        "positives": [
+          "Stated as fully functional",
+          "Good condition"
+        ],
+        "warnings": [
+          "Controller charging cable is not included"
+        ],
+        "questions": [
+          "Is this the disc or digital edition?",
+          "Is this the original or slim generation?"
+        ],
+        "seller_message_sv": "Hej! \u00c4r detta disc- eller digital-versionen? \u00c4r det original- eller slim-modellen? Tack!",
+        "confidence": "medium"
+      },
+      "created_at": 1789333592.9777422
     }
   },
   "ai_budget": {
