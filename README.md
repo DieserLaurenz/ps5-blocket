@@ -1,5 +1,9 @@
 # PS5 deals on Blocket and Tradera
 
+An independent hourly **IFK Göteborg men's home-ticket monitor** uses the same
+Telegram chat. It checks official club ticket links and sale announcements.
+See [IFK.md](IFK.md) for its sources, limitations and controls.
+
 An optional, modular **Tradera** monitor shares the existing remote schedule,
 Telegram notifications and AI budget. It is disabled until you configure approved
 Tradera API credentials. See [TRADERA.md](TRADERA.md) and run `Setup-Tradera.cmd`.
