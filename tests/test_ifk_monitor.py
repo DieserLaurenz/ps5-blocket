@@ -181,7 +181,7 @@ class DeliveryTests(unittest.TestCase):
         self.assertNotIn('3', self.store.saved[-1]['news'])
 
     def test_invalid_state_or_changed_recipient_fails(self):
-        for state in ({'version': 99}, {**self.state, 'tickets': {'id': 'invalid'}},
+        for state in ([], None, {'version': 99}, {**self.state, 'tickets': {'id': 'invalid'}},
                       {**self.state, 'recipient': 'other'}):
             with self.assertRaises(m.ServiceError):
                 m.prepare_state(state, 'recipient')

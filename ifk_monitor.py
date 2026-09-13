@@ -242,6 +242,8 @@ class GitHubStore:
 
 
 def prepare_state(state, recipient):
+    if not isinstance(state, dict):
+        raise ServiceError('Invalid IFK state; no notifications sent.')
     if not state:
         return {'version': 1, 'recipient': recipient, 'initialized': False,
                 'tickets': {}, 'news': {}, 'errors': {}}
