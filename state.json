@@ -266,6 +266,32 @@
         "confidence": "medium"
       },
       "created_at": 1789023389.5180042
+    },
+    "26559286": {
+      "fingerprint": "18873c5d3fd99cd11c9e321e4cd9772fa436d4d03a8681c86cdff39071d73afe",
+      "analysis": {
+        "generation": "original",
+        "edition": "digital",
+        "condition": "used",
+        "summary": "Used PS5 Digital Edition from 2022. The listing is incomplete regarding included accessories like controllers or cables.",
+        "included": [
+          "PS5 Digital Edition console"
+        ],
+        "positives": [
+          "Stated to be in working condition"
+        ],
+        "warnings": [
+          "Missing information about included controllers and cables",
+          "No mention of original packaging or receipt"
+        ],
+        "questions": [
+          "Are the original controller and cables included with the console?",
+          "Is the original receipt available?"
+        ],
+        "seller_message_sv": "Hej! \u00c4r originalkontroll och kablar inkluderade med konsolen? Finns originalkvitto kvar? Tack!",
+        "confidence": "medium"
+      },
+      "created_at": 1789305099.7464502
     }
   },
   "ai_budget": {
