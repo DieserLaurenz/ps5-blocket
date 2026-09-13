@@ -1,1 +1,31 @@
-{}
+{
+  "version": 1,
+  "recipient": "41898ffa9dda979ed3a7",
+  "initialized": true,
+  "tickets": {},
+  "news": {
+    "46930": [
+      "26dedfd1e656ffb957cae570ab5c9ea847d8b4ae1376f89773c38068acc5546d"
+    ],
+    "46559": [
+      "ac1ddc9ed193fe8de9f3f67829a63656a8a6c3da6cdd128beb608cbe008871bf"
+    ],
+    "46306": [
+      "328c6705566fcaf81c6aed4139ea395399970f6f2deb0a48ae53f25749f14078"
+    ],
+    "45899": [
+      "ed702c67bc1d22779ad22f3867cef6a12abbd0cee42f9722a1844d17bdb58055"
+    ],
+    "45685": [
+      "9f6f4ad0db587d8b188db81c9d0527b948bf108d48dce558e18dd1686f4d6871"
+    ],
+    "45541": [
+      "39c3b36d905a5bfe1092401f81ec9d92aba2949cd9508435c6acc53b62d0ea92"
+    ],
+    "45547": [
+      "33988eca53193fe419ce45dceee6ad85819eacb95e96ea386229cadcaa940b7e"
+    ]
+  },
+  "errors": {},
+  "started_at": "2026-09-13T11:10:48.938522+00:00"
+}
