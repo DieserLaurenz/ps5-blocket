@@ -69,8 +69,8 @@
   "last_health_day": "2026-09-13",
   "last_health_at": "2026-09-13T00:02:00+00:00",
   "market": {
-    "attempted_at": 1789292044.9606917,
-    "fetched_at": 1789292044.9606917,
+    "attempted_at": 1789313790.7667406,
+    "fetched_at": 1789313790.7667406,
     "max_price": 10000,
     "truncated": false,
     "samples": [
@@ -90,12 +90,6 @@
         "id": "26383713",
         "price": 6195,
         "generation": "slim",
-        "edition": "disc"
-      },
-      {
-        "id": "26536066",
-        "price": 6200,
-        "generation": "original",
         "edition": "disc"
       },
       {
