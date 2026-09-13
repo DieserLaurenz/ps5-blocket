@@ -50,6 +50,19 @@
       ],
       "photos_sent": 5,
       "photo_failures": 0
+    },
+    "26559286": {
+      "price": 3800,
+      "sent_at": "2026-09-13T13:11:43+00:00",
+      "assessment_id": "18873c5d3fd99cd11c9e321e4cd9772fa436d4d03a8681c86cdff39071d73afe",
+      "message_id": 47,
+      "photo_urls": [
+        "https://images.blocketcdn.se/dynamic/960w/item/26559286/9e452488-e81c-4831-a805-49c22af383ad",
+        "https://images.blocketcdn.se/dynamic/960w/item/26559286/26441dde-7a2e-4ede-9134-a7c4a7c1f78f",
+        "https://images.blocketcdn.se/dynamic/960w/item/26559286/cef8ab21-9aad-4d79-86b9-ad9264fb28c3",
+        "https://images.blocketcdn.se/dynamic/960w/item/26559286/20260b47-5f87-4bfc-92c4-62b4f2b520a3"
+      ],
+      "photos_sent": 0
     }
   },
   "last_health_day": "2026-09-13",
