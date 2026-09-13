@@ -62,7 +62,8 @@
         "https://images.blocketcdn.se/dynamic/960w/item/26559286/cef8ab21-9aad-4d79-86b9-ad9264fb28c3",
         "https://images.blocketcdn.se/dynamic/960w/item/26559286/20260b47-5f87-4bfc-92c4-62b4f2b520a3"
       ],
-      "photos_sent": 0
+      "photos_sent": 4,
+      "photo_failures": 0
     }
   },
   "last_health_day": "2026-09-13",
