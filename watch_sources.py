@@ -14,10 +14,13 @@ from monitor import ServiceError
 
 REFERENCE = 'H36215140'
 EU = set('AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE'.split())
-BASES = {'chrono24': 'https://www.chrono24.se', 'uret': 'https://www.uret.se', 'ebay': 'https://www.ebay.com'}
+BASES = {'chrono24': 'https://www.chrono24.se', 'uret': 'https://www.uret.se', 'ebay': 'https://www.ebay.com',
+         'corsovinci': 'https://www.corsovinci.com'}
 SEARCHES = {'chrono24': BASES['chrono24'] + '/hamilton/ref-h36215140.htm',
             'uret': BASES['uret'] + '/search/H36215140',
             'ebay': BASES['ebay'] + '/sch/i.html?_nkw=H36215140&_sop=15&_stposCountry=SE'}
+CORSO_PRODUCT = BASES['corsovinci'] + '/en/products/hamilton-mens-h36215140-jazzmaster-performer-auto-38mm'
+CORSO_SWEDEN = CORSO_PRODUCT + '?country=SE&currency=SEK'
 
 
 class Ineligible(ValueError):
@@ -240,6 +243,71 @@ class Client:
         return html
 
 
+def js_assignment(html, name):
+    match = re.search(re.escape(name) + r'\s*=\s*', html)
+    if not match:
+        raise ValueError('Expected storefront metadata missing')
+    return json.JSONDecoder().raw_decode(html[match.end():])[0]
+
+
+def parse_corso(html):
+    """Current product + on-page Europe tariff, with explicitly labelled FX estimate."""
+    doc = Document(html).root
+    if js_assignment(html, 'Shopify.country') != 'SE':
+        raise Ineligible('Shop-Lieferland Schweden nicht bestätigt')
+    currency = js_assignment(html, 'Shopify.currency')
+    if currency.get('active') != 'SEK':
+        raise Ineligible('Shop-Währung SEK nicht bestätigt')
+    fx = float(currency['rate'])
+    if not math.isfinite(fx) or not 5 < fx < 20:
+        raise ValueError('Implausible store EUR/SEK rate')
+    meta = js_assignment(html, 'var meta')
+    p = meta['product']
+    variants = p.get('variants', [])
+    if p.get('vendor') != 'Hamilton' or p.get('type') != 'Watch' or len(variants) != 1 or variants[0].get('sku') != REFERENCE:
+        raise Ineligible('Referenz/Produkttyp nicht eindeutig')
+    variant = variants[0]
+    if p.get('handle') != CORSO_PRODUCT.rsplit('/', 1)[-1]:
+        raise ValueError('Unexpected main product')
+    forms = [f for f in doc.find(tag='form') if f.attrs.get('id') == 'AddToCartForm']
+    if len(forms) != 1:
+        raise ValueError('Main product form missing')
+    buttons = [b for b in forms[0].find(tag='button') if b.attrs.get('name') == 'add' and 'disabled' not in b.attrs]
+    if not buttons or not re.search(r'Add to cart|Aggiungi al carrello', buttons[0].text(), re.I):
+        raise Ineligible('Nicht bestellbar')
+    body = doc.text()
+    if not re.search(r'Condition:\s*New|Condizione:\s*Nuovo', body):
+        raise Ineligible('Neuzustand nicht bestätigt')
+    price = money(variant['price']) / 100
+    visible = forms[0].find(cls='price-min')
+    if not visible or abs(sek(visible[0].text()) - price) > .01 or price <= 0:
+        raise ValueError('Visible product price conflict')
+    # Tariff table uses rowspans: later rows inherit the preceding region.
+    region, shipping_eur = '', []
+    for tr in doc.find(tag='tr'):
+        cells = [n for n in tr.children if isinstance(n, Node) and n.tag == 'td']
+        if len(cells) == 4:
+            region = cells[0].text()
+        if len(cells) in (3, 4) and region.lower() in ('europe', 'europa'):
+            match = re.search(r'€\s*(\d+(?:[.,]\d{2})?)', cells[-1].text())
+            if match:
+                shipping_eur.append(money(match[1].replace(',', '.')))
+    if not shipping_eur:
+        raise Ineligible('Europa-Versandtarif nicht bestätigt')
+    shipping = math.ceil(min(shipping_eur) * fx * 100) / 100
+    photos = [n.attrs.get('content', '') for n in doc.find(tag='meta') if n.attrs.get('property') == 'og:image:secure_url']
+    photos = [u for u in photos if urlsplit(u).scheme == 'https' and urlsplit(u).hostname == 'www.corsovinci.com']
+    return {'id': 'corsovinci:' + str(p['id']), 'source': 'corsovinci', 'reference': REFERENCE,
+            'title': variant['name'], 'url': CORSO_SWEDEN, 'condition': 'new',
+            'condition_text': 'Neu laut Händler', 'price_sek': price, 'shipping_sek': shipping,
+            'total_sek': round(price + shipping, 2), 'destination': 'SE', 'origin': 'IT', 'photos': photos[:10],
+            'availability': 'Bestellbar; Verfügbarkeit/Liefertermin beim Händler prüfen',
+            'scope': 'Laut Händler: Originalbox, Originalpapiere und 24 Monate Garantie',
+            'shipping_evidence': f'Shop-Land SE; Europa-Tarif {min(shipping_eur):g} EUR; Shopkurs {fx:g} SEK/EUR',
+            'native_price': f'{price:g} SEK', 'total_estimated': True,
+            'total_note': 'Versandtarif in EUR zum Shopkurs umgerechnet; Checkout-Endpreis kann abweichen.'}
+
+
 def listing_links(source, html):
     doc = Document(html).root
     if source == 'uret':
@@ -269,14 +337,18 @@ def collect(config, client_factory=Client):
         client = client_factory()
         status = {'source': source, 'status': 'ok', 'checked': 0, 'found': 0, 'errors': []}
         try:
-            links, truncated = listing_links(source, client.get(SEARCHES[source]))
+            if source == 'corsovinci':
+                links, truncated = [CORSO_SWEDEN], False
+            else:
+                links, truncated = listing_links(source, client.get(SEARCHES[source]))
             status['found'] = len(links)
             if truncated or len(links) > config['detail_limit']:
                 status['errors'].append('Ergebnis-/Detailgrenze erreicht; Abdeckung unvollständig')
             for url in links[:config['detail_limit']]:
                 try:
                     html = client.get(url)
-                    row = parse_uret(html, url) if source == 'uret' else parse_schema(source, html, url)
+                    row = (parse_corso(html) if source == 'corsovinci' else parse_uret(html, url)
+                           if source == 'uret' else parse_schema(source, html, url))
                     offers.append(row)
                     status['checked'] += 1
                 except Ineligible as exc:

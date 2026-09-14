@@ -104,14 +104,16 @@ def message(row, config, old=None):
         label += ' · unter Schnäppchengrenze'
     condition = 'Neu/ungetragen laut Anbieter' if row['condition'] == 'new' else 'Gebraucht laut Anbieter'
     difference = f' (zuvor gemeldet: {old:g} SEK)' if old is not None else ''
+    approximate = 'ca. ' if row.get('total_estimated') else ''
     return (f'<b>{label}</b> · {escape(row["source"])}\n\n'
             f'<b>Hamilton H36215140</b>\n{escape(row["title"][:180])}\n'
-            f'💰 <b>{row["total_sek"]:g} SEK inkl. Versand</b>{difference}\n'
+            f'💰 <b>{approximate}{row["total_sek"]:g} SEK inkl. Versand</b>{difference}\n'
             f'Uhr {row["price_sek"]:g} + Versand {row["shipping_sek"]:g} SEK\n'
             f'🚚 Nach Schweden · Angebotsstandort {escape(row["origin"])}\n'
             f'{condition}\n{escape(row["condition_text"][:240])}\n'
             f'Lieferbarkeit: {escape(row["availability"][:240])}\n'
             f'Lieferumfang/Garantie: {escape(row["scope"][:350])}\n\n'
+            f'{escape(row.get("total_note", ""))}\n'
             f'<a href="{escape(row["url"], quote=True)}">Angebot öffnen</a>\n'
             'Anbieterangaben, keine Echtheitsprüfung. Endpreis und Zahlung ohne BankID vor Kauf prüfen. '
             'SEK-Preise können durch Wechselkurse schwanken.')
@@ -128,7 +130,8 @@ def health_message(report, config):
         rows = [r for r in report['offers'] if r['condition'] == condition]
         if rows:
             row = min(rows, key=lambda r: r['total_sek'])
-            lines.append(f'Günstigstes geprüftes Angebot ({label}): {row["total_sek"]:g} SEK — {row["source"]}\n{row["url"]}')
+            approximate = 'ca. ' if row.get('total_estimated') else ''
+            lines.append(f'Günstigstes geprüftes Angebot ({label}): {approximate}{row["total_sek"]:g} SEK — {row["source"]}\n{row["url"]}')
     lines.append('Keine vollständige Marktabdeckung. Unbekannter Versand/Importgesamtpreis wird ausgeschlossen.')
     return '\n'.join(lines)
 
@@ -171,7 +174,7 @@ def write_report(report, directory):
     for row in report['offers']:
         rows.append('<tr>' + ''.join(f'<td>{escape(str(row[k]))}</td>' for k in
                     ('source', 'condition', 'price_sek', 'shipping_sek', 'total_sek', 'availability'))
-                    + f'<td><a href="{escape(row["url"], quote=True)}">Angebot</a></td></tr>')
+                    + f'<td><a href="{escape(row["url"], quote=True)}">Angebot</a> {escape(row.get("total_note", ""))}</td></tr>')
     status = escape(json.dumps(report['coverage'], indent=2, ensure_ascii=False))
     excluded = escape(json.dumps(report['excluded'], indent=2, ensure_ascii=False))
     html = ('<!doctype html><html lang="de"><meta charset="utf-8"><title>Hamilton H36215140</title>'

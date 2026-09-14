@@ -49,6 +49,14 @@ about 12,361 SEK when fetched with Sweden as the actual destination.
   total. Most eBay pages may not expose those fields. It appears as failed/limited
   coverage, never as a reliable empty market. An authorized Browse API integration
   would need separate eBay developer credentials and is not included.
+- **Corso Vinci:** direct retailer product, not the Chrono24 listing. Require exact
+  SKU, orderable main-product form, matching visible price and variant price,
+  storefront country `SE` and currency `SEK`. The product page includes its
+  [Europe shipping tariff](https://www.corsovinci.com/pages/spedizioni). Convert that
+  tariff from EUR using the current storefront's EUR/SEK rate, round shipping up to
+  the next öre, and label the total **approximate** in alerts/reports. This is not a
+  checkout quote. No cart is created. One fixed new-product URL is checked, not a
+  used-market search. Locally observed: 11,458 SEK + approximately 114.58 SEK shipping.
 - EveryWatch, WatchCharts, Kleinanzeigen, Blocket and Tradera are **not** monitored.
 
 `curl_cffi` impersonates a supported browser's TLS/HTTP fingerprint; it does not run
@@ -59,6 +67,12 @@ scheduled run starts a fresh check. Respect the sites' terms and permissions.
 For an explicit compatibility check, `WATCH_BROWSER_PROFILE=chrome142` selects the
 newer profile instead of the default `chrome124`; the manual workflow exposes the
 same choice. No automatic profile rotation occurs.
+
+Deployment checks on 14 September: both Linux and Windows GitHub runners returned
+HTTP 403 for Chrono24/eBay; changing Chrome 124 to 142 on Linux did not resolve it.
+Uret worked on both. **Local Chrono24 success does not imply remote coverage.**
+The manual workflow's runner selector is diagnostic only; scheduling defaults to
+Linux, with no automatic runner/IP rotation.
 
 Unknown shipping cost/destination, ambiguous reference, unsupported condition,
 sold-out goods and non-EU/unknown listing locations do not trigger offer alerts.

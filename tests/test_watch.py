@@ -37,6 +37,18 @@ def uret_html(condition='new', extra=''):
             '<script id="ng-state" type="application/json">' + json.dumps(d) + '</script>' + extra)
 
 
+def corso_html():
+    meta = {'product': {'id': 99, 'vendor': 'Hamilton', 'type': 'Watch',
+            'handle': sources.CORSO_PRODUCT.rsplit('/', 1)[-1],
+            'variants': [{'sku': 'H36215140', 'name': 'Hamilton H36215140', 'price': 1000000}]}}
+    return ('<script>Shopify.country = "SE"; Shopify.currency = {"active":"SEK","rate":"11.5"};'
+            'var meta = ' + json.dumps(meta) + ';</script><p>Condition: New</p>'
+            '<form id="AddToCartForm"><span class="price-min">10 000 kr</span><button name="add">Add to cart</button></form>'
+            '<table><tr><td>Europe</td><td>Express</td><td>2 days</td><td>€19.95</td></tr>'
+            '<tr><td>Economy</td><td>4 days</td><td>€9.95</td></tr>'
+            '<tr><td>Italy</td><td>Free</td><td>4 days</td><td>€0.00</td></tr></table>')
+
+
 class ParseTests(unittest.TestCase):
     def test_exact_product_and_shipping(self):
         row = sources.parse_schema('chrono24', schema_html(), CHRONO)
@@ -141,6 +153,38 @@ class ParseTests(unittest.TestCase):
         rows, coverage, excluded = sources.collect({'sources': ['ebay', 'chrono24'], 'detail_limit': 25}, lambda: c)
         self.assertEqual(len(rows), 1)
         self.assertEqual([x['status'] for x in coverage], ['error', 'ok'])
+
+    def test_corso_shipping_uses_europe_not_italy(self):
+        row = sources.parse_corso(corso_html())
+        self.assertEqual(row['shipping_sek'], 114.43)
+        self.assertEqual(row['total_sek'], 10114.43)
+        self.assertTrue(row['total_estimated'])
+
+    def test_corso_requires_country_and_currency(self):
+        for html in (corso_html().replace('"SE"', '"US"'), corso_html().replace('"SEK"', '"USD"')):
+            with self.assertRaises(sources.Ineligible): sources.parse_corso(html)
+
+    def test_corso_requires_live_shipping_tariff(self):
+        with self.assertRaises(sources.Ineligible): sources.parse_corso(corso_html().replace('Europe', 'Unknown'))
+
+    def test_corso_requires_orderable_correct_product(self):
+        for html in (corso_html().replace('name="add"', 'name="add" disabled'),
+                     corso_html().replace('H36215140', 'H36215640'),
+                     corso_html().replace('Condition: New', 'Condition: Used')):
+            with self.assertRaises(sources.Ineligible): sources.parse_corso(html)
+
+    def test_corso_price_crosscheck(self):
+        with self.assertRaises(ValueError): sources.parse_corso(corso_html().replace('10 000 kr', '9000 kr'))
+
+    def test_corso_bad_fx_fails_closed(self):
+        with self.assertRaises(ValueError): sources.parse_corso(corso_html().replace('"11.5"', '"NaN"'))
+
+    def test_corso_estimate_visible_in_alert(self):
+        row = sources.parse_corso(corso_html())
+        cfg = monitor.config_from(Path(__file__).resolve().parents[1] / 'watch-config.json')
+        text = monitor.message(row, cfg)
+        self.assertIn('ca. ', text)
+        self.assertIn('Checkout-Endpreis', text)
 
 
 class MemoryStore:

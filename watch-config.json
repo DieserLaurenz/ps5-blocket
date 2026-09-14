@@ -5,6 +5,6 @@
   "bargain_total_sek": {"new": 10500, "used": 8000},
   "minimum_drop_sek": 100,
   "detail_limit": 25,
-  "sources": ["chrono24", "uret", "ebay"],
+  "sources": ["chrono24", "uret", "ebay", "corsovinci"],
   "price_research_date": "2026-09-14"
 }
