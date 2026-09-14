@@ -56,6 +56,9 @@ JavaScript, solve CAPTCHAs or guarantee access. There is no proxy rotation, logi
 challenge solving or retry loop for a blocked source. Requests are spaced at least
 1.5 seconds apart within a source. A block ends that source's check; the next
 scheduled run starts a fresh check. Respect the sites' terms and permissions.
+For an explicit compatibility check, `WATCH_BROWSER_PROFILE=chrome142` selects the
+newer profile instead of the default `chrome124`; the manual workflow exposes the
+same choice. No automatic profile rotation occurs.
 
 Unknown shipping cost/destination, ambiguous reference, unsupported condition,
 sold-out goods and non-EU/unknown listing locations do not trigger offer alerts.

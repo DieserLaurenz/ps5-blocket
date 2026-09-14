@@ -9,6 +9,13 @@ on:
         description: 'Live prüfen ohne Telegram und Statusänderung'
         type: boolean
         default: true
+      browser_profile:
+        description: 'HTTP-Profil für einen gezielten Kompatibilitätstest'
+        type: choice
+        default: chrome124
+        options:
+          - chrome124
+          - chrome142
 
 permissions:
   contents: write
@@ -34,6 +41,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DRY_RUN: ${{ inputs.dry_run }}
+          WATCH_BROWSER_PROFILE: ${{ inputs.browser_profile || 'chrome124' }}
         run: |
           if [ "$DRY_RUN" = 'true' ]; then
             python3 watch_monitor.py --dry-run

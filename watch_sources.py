@@ -4,6 +4,7 @@ from __future__ import annotations
 from html import unescape
 import json
 import math
+import os
 import re
 import time
 from urllib.parse import urljoin, urlsplit, urlunsplit
@@ -210,7 +211,10 @@ class Client:
     def __init__(self):
         # Lazy import: all parsing/state tests run offline without third-party packages.
         from curl_cffi import requests
-        self.session = requests.Session(impersonate='chrome124', timeout=25,
+        profile = os.environ.get('WATCH_BROWSER_PROFILE', 'chrome124')
+        if profile not in ('chrome124', 'chrome142'):
+            raise ValueError('Unsupported browser profile')
+        self.session = requests.Session(impersonate=profile, timeout=25,
                                         headers={'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.7'})
         self.last_request = 0
 
