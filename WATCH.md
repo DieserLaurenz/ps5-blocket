@@ -71,6 +71,9 @@ same choice. No automatic profile rotation occurs.
 Deployment checks on 14 September: both Linux and Windows GitHub runners returned
 HTTP 403 for Chrono24/eBay; changing Chrome 124 to 142 on Linux did not resolve it.
 Uret worked on both. **Local Chrono24 success does not imply remote coverage.**
+The subsequent Linux check also verified Corso Vinci with Sweden selected:
+approximately 11,572.58 SEK including converted shipping versus 14,494 SEK at Uret.
+Thus current working remote coverage is **Uret + Corso Vinci**, not Chrono24/eBay.
 The manual workflow's runner selector is diagnostic only; scheduling defaults to
 Linux, with no automatic runner/IP rotation.
 
