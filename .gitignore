@@ -1,5 +1,6 @@
 __pycache__/
 .watch-venv/
+.browser-test-venv/
 output/
 samples/
 sample*.html

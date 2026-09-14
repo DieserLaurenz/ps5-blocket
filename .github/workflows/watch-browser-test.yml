@@ -1,0 +1,28 @@
+name: Hamilton Browser Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hamilton-browser-test
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.event.repository.visibility == 'public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install isolated browser test dependencies
+        run: |
+          python3 -m venv .browser-test-venv
+          .browser-test-venv/bin/python -m pip install playwright==1.62.0
+          .browser-test-venv/bin/python -m playwright install --with-deps chromium
+      - name: Read public Chrono24 pages with Chromium
+        run: xvfb-run --auto-servernum .browser-test-venv/bin/python watch_browser_probe.py
