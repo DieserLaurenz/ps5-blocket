@@ -23,6 +23,11 @@ Gallery metadata is reused from description checks; new alerts without checked d
 
 ## Local use
 
+The independent **Hamilton H36215140 watch monitor** is documented in [WATCH.md](WATCH.md).
+It includes new and used watches with confirmed Sweden shipping, separate all-in
+price limits, its own Telegram history, and Chrono24/Uret coverage. eBay is currently
+experimental/unreliable and reported separately in source health.
+
 Windows and Python 3.10+. No additional packages, account or API key are needed for the basic local scraper.
 
 Double-click `Start.cmd` to search and open `output/angebote.html` in your browser.

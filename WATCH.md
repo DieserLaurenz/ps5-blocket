@@ -1,0 +1,122 @@
+# Hamilton H36215140 monitor
+
+Independent watch alerts in the existing Telegram chat. No changes to PS5/IFK filtering,
+secrets or notification histories. Watches are new/unworn **and** used.
+
+## Price policy
+
+Research snapshot: 14 September 2026. These are adjustable buying targets, **not a
+valuation, authenticated offers, or verified completed-sale prices**.
+
+| Condition | Alert at total ≤ | Bargain highlight at total ≤ |
+| --- | ---: | ---: |
+| New / unworn | 11,500 SEK | 10,500 SEK |
+| Used, acceptable stated condition | 9,000 SEK | 8,000 SEK |
+
+All limits include the publicly stated shipping cost to Sweden. The new target is
+about 24% below the manufacturer's Swedish list price and below the roughly
+12,200–12,400 SEK delivered prices observed directly on qualifying Chrono24 offers.
+The used target is about 22% below our new buying target, allowing a discount for
+wear, remaining warranty and private-sale risk. Used-market evidence is sparse;
+the ceiling is a conservative recommendation, not a claimed statistical median.
+
+Sources used to set the initial targets:
+
+- [Hamilton Sweden](https://www.hamiltonwatch.com/sv-se/h36215140-jazzmaster-performer-auto.html): recommended price 15,095 SEK.
+- [Uret](https://www.uret.se/hamilton/jazzmaster/h36215140/1080987): 14,395 SEK + 99 SEK shipping, ordered on demand, 1–3 weeks.
+- [Chrono24 / Corso Vinci](https://www.chrono24.se/hamilton/mens-h36215140-jazzmaster-performer-auto-38mm--id48515488.htm): direct Sweden-context check about 12,176 SEK including shipping. Prices and currency conversion fluctuate.
+- [Chrono24 / Wear the Time](https://www.chrono24.se/hamilton/jazzmaster-performer-auto-38-mm--h36215140--id43482599.htm): direct Sweden-context check about 12,361 SEK including shipping, procurement required.
+- An older [used full-set asking-price listing](https://www.chrono24.com.tr/hamilton/jazzmaster-performer-auto--38mm--id44945952.htm) was indexed at €750. It is now removed/redirects. This is historical asking-price context **only**, not a live recommendation or proof of sale.
+
+Do not use a search snippet's low price as a Sweden-delivered price: a `.se` page
+can still contain another destination's pricing. One indexed 9,886 SEK offer was
+about 12,361 SEK when fetched with Sweden as the actual destination.
+
+## Sources and limitations
+
+- **Chrono24:** exact-reference search, followed by individual offer checks. Public
+  product JSON-LD supplies exact reference, condition, price, shipping destination,
+  shipping rate and location. The visible price is preferred if consistent; table
+  fields preserve procurement time, box/papers and native price. No purchase/account
+  activity or nationality/identity assertions are performed.
+- **Uret:** current exact-reference search discovers new stock IDs, including used
+  items if returned. Parse the product's Angular server-rendered state and visible
+  Sweden selector/shipping quote. A product that is orderable but not in stock is
+  labelled as such. Removed items (HTTP 410) are not live stock.
+- **eBay:** experimental public-page adapter, **not verified operational**. Current
+  probes encountered HTTP 403 or unrecognized responses. The shared strict parser
+  only admits an exact-reference main product with explicit SE shipping and a SEK
+  total. Most eBay pages may not expose those fields. It appears as failed/limited
+  coverage, never as a reliable empty market. An authorized Browse API integration
+  would need separate eBay developer credentials and is not included.
+- EveryWatch, WatchCharts, Kleinanzeigen, Blocket and Tradera are **not** monitored.
+
+`curl_cffi` impersonates a supported browser's TLS/HTTP fingerprint; it does not run
+JavaScript, solve CAPTCHAs or guarantee access. There is no proxy rotation, login,
+challenge solving or retry loop for a blocked source. Requests are spaced at least
+1.5 seconds apart within a source. A block ends that source's check; the next
+scheduled run starts a fresh check. Respect the sites' terms and permissions.
+
+Unknown shipping cost/destination, ambiguous reference, unsupported condition,
+sold-out goods and non-EU/unknown listing locations do not trigger offer alerts.
+The EU-location check is a conservative import filter, **not verification of the
+actual dispatch warehouse or final tax treatment**. The displayed total is the
+listed watch price plus listed shipping, not a guaranteed checkout total. Optional
+insurance, payment/FX fees, and undisclosed checkout charges are not estimated.
+Confirm origin, checkout total, condition, authenticity, bracelet links, warranty
+and payment without Swedish BankID before buying. The monitor needs no BankID,
+but cannot guarantee a seller/payment provider never requests identification.
+
+Only the first search page and up to 25 detail pages per source are checked. Detected
+pagination/limits generate a partial-coverage warning. Seller relists can have new
+IDs; cross-platform duplicate watches are not automatically equated. Broken site
+formats are reported, not bypassed. Remote access may differ from local access.
+
+## Run locally
+
+Python 3.10+. The isolated environment avoids changing dependencies for PS5/IFK.
+
+```powershell
+python -m venv .watch-venv
+.watch-venv\Scripts\python.exe -m pip install -r requirements-watch.txt
+.watch-venv\Scripts\python.exe watch_monitor.py --dry-run
+.watch-venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+`Watch.cmd` runs a live read-only check and opens the local report once the
+environment is installed. `output/watch-offers.html` and `watch-offers.json` include
+all verified offers, including those over the alert limits, source coverage and
+exclusion reasons. Check the timestamp; reports are snapshots, not live pages.
+`--dry-run` writes only those local reports: no Telegram or notification-state writes.
+To deliberately send locally with configured Telegram environment variables, use
+`--local-state output/watch-state.json`; do not run it alongside the remote notifier
+unless you want a separate alert history.
+
+## Remote operation
+
+`.github/workflows/watch.yml` is scheduled at minutes 8, 23, 38 and 53. GitHub Actions
+schedules are best-effort and may be delayed or skipped; this is **not** an exact
+15-minute SLA. Public repositories can have schedules disabled after prolonged
+inactivity. A daily heartbeat helps identify problems while the workflow runs, but
+cannot report the scheduler itself stopping. Check Actions if heartbeats stop.
+
+The repository variable `WATCH_MONITOR_ENABLED=true` enables notifications and
+scheduled checks. Set it to `false` to stop them. Manual `dry_run=true` works even
+when disabled. Existing `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` secrets are reused.
+Durable state lives at `watch-state:watch-state.json`, independently of other bots.
+Provision this file with the result of `watch_monitor.empty_state()` before the first
+notifying run. Missing/corrupt remote state is an error, never an automatic reset.
+
+New qualifying IDs alert once. Further alerts require a new **lowest previously
+notified total** at least 100 SEK lower; small FX/rounding fluctuations are suppressed,
+but larger FX changes can still trigger an alert. Initial qualifying offers alert on
+the first run. Text delivery is saved immediately, then up to ten listing images are
+sent. Failed photo batches retry at most three times while the offer qualifies; no
+text resend is required. A crash between Telegram delivery and durable save can still
+duplicate a message; exactly-once delivery across both services is not possible.
+
+A status message is sent initially, every 24 hours and on source health changes. It
+includes the cheapest verified offer per condition, even above the limits, and any
+failed sources. Partial failure does not suppress healthy sources; all-source failure
+also fails the workflow. Repository state is public but contains no tokens, chat ID
+or seller contact data (only a recipient hash and notification metadata).

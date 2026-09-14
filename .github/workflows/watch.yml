@@ -1,0 +1,42 @@
+name: Hamilton Watch
+
+on:
+  schedule:
+    - cron: '8,23,38,53 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Live prüfen ohne Telegram und Statusänderung'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hamilton-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event.repository.visibility == 'public' && (vars.WATCH_MONITOR_ENABLED == 'true' || inputs.dry_run == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install watch HTTP client
+        run: python3 -m pip install -r requirements-watch.txt
+      - name: Check watch offers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = 'true' ]; then
+            python3 watch_monitor.py --dry-run
+          else
+            python3 watch_monitor.py
+          fi

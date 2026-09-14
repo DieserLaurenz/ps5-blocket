@@ -1,4 +1,5 @@
 __pycache__/
+.watch-venv/
 output/
 samples/
 sample*.html
