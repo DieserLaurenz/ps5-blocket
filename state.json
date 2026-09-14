@@ -345,6 +345,32 @@
         "confidence": "medium"
       },
       "created_at": 1789333592.9777422
+    },
+    "26579642": {
+      "fingerprint": "d1cf0c3cc5c5463479d0e60418f2d99da52274cb3f1fecf8a15ba7631bc8a470",
+      "analysis": {
+        "generation": "unknown",
+        "edition": "unknown",
+        "condition": "unknown",
+        "summary": "The listing describes a PS5 console and one controller. Generation and edition are not specified.",
+        "included": [
+          "PS5 console",
+          "DualSense controller"
+        ],
+        "positives": [],
+        "warnings": [
+          "Generation (original/slim/pro) is not specified",
+          "Edition (disc/digital) is not specified",
+          "Condition is not specified"
+        ],
+        "questions": [
+          "Is this the disc or digital edition of the PS5?",
+          "Which generation is this console (original, slim, or pro)?"
+        ],
+        "seller_message_sv": "Hej! \u00c4r detta disc- eller digital-versionen av PS5? Vilken generation \u00e4r konsolen (original, slim eller pro)? Tack!",
+        "confidence": "low"
+      },
+      "created_at": 1789376796.0274434
     }
   },
   "ai_budget": {
