@@ -77,6 +77,27 @@ Thus current working remote coverage is **Uret + Corso Vinci**, not Chrono24/eBa
 The manual workflow's runner selector is diagnostic only; scheduling defaults to
 Linux, with no automatic runner/IP rotation.
 
+### One-off remote browser diagnostic
+
+The manual-only **Hamilton Browser Test** workflow runs ordinary headed Chromium
+under Xvfb on a Linux GitHub runner, using Playwright 1.62.0. It reads the public
+reference search and at most three offer pages, stopping on HTTP 403/429. It has
+read-only repository permissions, no Telegram secrets, no notification/state writes,
+no proxy or CAPTCHA solving, and does not change the production monitor.
+
+[Test on 14 September 2026](https://github.com/DieserLaurenz/ps5-blocket/actions/runs/34863282444):
+Chromium 151 loaded the search with HTTP 200 and found five offer links. The first
+offer navigation returned HTTP 307 followed by HTTP 403 and a `Vänta...` challenge
+page. No further offers were opened. Consequently **zero Sweden-delivered offers
+were verified**; search-page access alone is not sufficient for reliable alerts.
+The diagnostic intentionally exits with code 2 when no qualifying detail page can
+be verified, so this run is marked failed rather than presenting false coverage.
+This does not establish that all offers or all hosting providers are blocked.
+
+To repeat explicitly: Actions → Hamilton Browser Test → Run workflow. Compact
+`WATCH_BROWSER_SEARCH`, `WATCH_BROWSER_DETAIL` and `WATCH_BROWSER_RESULT` log records
+contain HTTP results and parsing outcomes, not raw HTML, cookies or screenshots.
+
 Unknown shipping cost/destination, ambiguous reference, unsupported condition,
 sold-out goods and non-EU/unknown listing locations do not trigger offer alerts.
 The EU-location check is a conservative import filter, **not verification of the
