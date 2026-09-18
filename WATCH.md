@@ -140,6 +140,11 @@ is no new server, paid service, login, proxy, CAPTCHA solver or stealth extensio
 The separate Hamilton Browser Test still requires a verified detail offer to pass;
 its stricter diagnostic result is distinct from successful search-only monitoring.
 
+The [full remote dry run on 18 September](https://github.com/DieserLaurenz/ps5-blocket/actions/runs/35366634514)
+successfully produced four unverified Chrono24 hints, zero verified Chrono24 offers,
+and two verified retailer offers. eBay remained blocked. No Telegram messages or
+notification-state writes were made by that dry run. The offline suite has 175 tests.
+
 Unknown shipping cost/destination, ambiguous reference, unsupported condition,
 sold-out goods and non-EU/unknown listing locations do not trigger verified offer alerts.
 The EU-location check is a conservative import filter, **not verification of the
