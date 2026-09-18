@@ -35,13 +35,33 @@ jobs:
   check:
     if: github.event.repository.visibility == 'public' && (vars.WATCH_MONITOR_ENABLED == 'true' || inputs.dry_run == true)
     runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-    timeout-minutes: 6
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
       - name: Install watch HTTP client
         run: python3 -m pip install -r requirements-watch.txt
+      - name: Install Chrono24 browser
+        continue-on-error: true
+        shell: bash
+        run: |
+          python3 -m pip install playwright==1.62.0
+          if [ "$RUNNER_OS" = 'Linux' ]; then
+            python3 -m playwright install --with-deps chromium
+          else
+            python3 -m playwright install chromium
+          fi
+      - name: Read Chrono24 without notification secrets
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = 'Linux' ]; then
+            xvfb-run --auto-servernum python3 watch_chrono_browser.py
+          else
+            python3 watch_chrono_browser.py
+          fi
       - name: Check watch offers
         shell: bash
         env:
@@ -52,7 +72,7 @@ jobs:
           WATCH_BROWSER_PROFILE: ${{ inputs.browser_profile || 'chrome124' }}
         run: |
           if [ "$DRY_RUN" = 'true' ]; then
-            python3 watch_monitor.py --dry-run
+            python3 watch_monitor.py --chrono-snapshot output/chrono-browser.json --dry-run
           else
-            python3 watch_monitor.py
+            python3 watch_monitor.py --chrono-snapshot output/chrono-browser.json
           fi

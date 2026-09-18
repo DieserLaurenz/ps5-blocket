@@ -4,6 +4,7 @@
   "max_total_sek": {"new": 11500, "used": 9000},
   "bargain_total_sek": {"new": 10500, "used": 8000},
   "minimum_drop_sek": 100,
+  "chrono24_unverified_hints": true,
   "detail_limit": 25,
   "sources": ["chrono24", "uret", "ebay", "corsovinci"],
   "price_research_date": "2026-09-14"

@@ -73,7 +73,7 @@ HTTP 403 for Chrono24/eBay; changing Chrome 124 to 142 on Linux did not resolve 
 Uret worked on both. **Local Chrono24 success does not imply remote coverage.**
 The subsequent Linux check also verified Corso Vinci with Sweden selected:
 approximately 11,572.58 SEK including converted shipping versus 14,494 SEK at Uret.
-Thus current working remote coverage is **Uret + Corso Vinci**, not Chrono24/eBay.
+At that point, working remote coverage was **Uret + Corso Vinci**, not Chrono24/eBay.
 The manual workflow's runner selector is diagnostic only; scheduling defaults to
 Linux, with no automatic runner/IP rotation.
 
@@ -98,8 +98,50 @@ To repeat explicitly: Actions → Hamilton Browser Test → Run workflow. Compac
 `WATCH_BROWSER_SEARCH`, `WATCH_BROWSER_DETAIL` and `WATCH_BROWSER_RESULT` log records
 contain HTTP results and parsing outcomes, not raw HTML, cookies or screenshots.
 
+### Remote Chrono24 discoveries (18 September 2026)
+
+The user explicitly enabled separate **unverified discovery hints**. The scheduled
+Hamilton Watch workflow now runs ordinary Chromium/Playwright before the notification
+step. A fresh test on 18 September again read four search listings but hit HTTP 403
+on the first detail page. This is **search coverage, not verified buying coverage**.
+
+`watch_chrono_browser.py` reads the exact-reference search and up to five details,
+stopping immediately on HTTP 403/429. Only result cards under the exact-reference
+heading are used; links in recommendations/footer content and visibly different
+references are excluded. When detail pages are readable, the existing strict
+reference, condition, EU-origin, SEK-total and Sweden-shipping checks still apply.
+
+If details are blocked/unreadable, `chrono24_unverified_hints=true` allows a separate
+Telegram message headed **Chrono24 · ungeprüfter Hinweis**. It explicitly states:
+
+- Found in the H36215140 search, but exact product details and used/new condition
+  have not been confirmed. The listing may be new rather than used.
+- Sweden shipping and the delivered total are unknown. Search-card prices may be
+  for another destination and are never used as validated SEK totals.
+- No price-ceiling check is possible. These hints are not counted as matching offers.
+
+Each newly discovered listing ID is sent once, including current listings on the
+first successful run. "Newly discovered" does not assert that the seller just posted
+it. Disappearing/reappearing IDs do not alert again. Search-only price changes do not
+trigger price-drop alerts. Confirmed offer-price drops retain their existing rules.
+IDs already notified as verified offers do not generate subsequent unverified hints;
+a previously hinted listing can still trigger a later verified qualifying alert.
+
+Hint timestamps are saved separately in `unverified_notified` on the existing
+`watch-state` branch. Version-1 state is extended without clearing old history.
+The browser runs without notification secrets. Its temporary snapshot at
+`output/chrono-browser.json` stays on the ephemeral runner; it is not logged,
+committed or uploaded as an artifact. The notification step re-parses the snapshot
+and rejects missing, corrupt, future-dated or older-than-30-minute input. Browser
+failures preserve history and do not stop healthy retailer sources.
+
+The main workflow remains scheduled every 15 minutes on a best-effort basis. There
+is no new server, paid service, login, proxy, CAPTCHA solver or stealth extension.
+The separate Hamilton Browser Test still requires a verified detail offer to pass;
+its stricter diagnostic result is distinct from successful search-only monitoring.
+
 Unknown shipping cost/destination, ambiguous reference, unsupported condition,
-sold-out goods and non-EU/unknown listing locations do not trigger offer alerts.
+sold-out goods and non-EU/unknown listing locations do not trigger verified offer alerts.
 The EU-location check is a conservative import filter, **not verification of the
 actual dispatch warehouse or final tax treatment**. The displayed total is the
 listed watch price plus listed shipping, not a guaranteed checkout total. Optional
@@ -108,7 +150,8 @@ Confirm origin, checkout total, condition, authenticity, bracelet links, warrant
 and payment without Swedish BankID before buying. The monitor needs no BankID,
 but cannot guarantee a seller/payment provider never requests identification.
 
-Only the first search page and up to 25 detail pages per source are checked. Detected
+Only the first search page and up to 25 HTTP detail pages per source (five in the
+Chrono24 browser step, fewer on a block) are checked. Detected
 pagination/limits generate a partial-coverage warning. Seller relists can have new
 IDs; cross-platform duplicate watches are not automatically equated. Broken site
 formats are reported, not bypassed. Remote access may differ from local access.
@@ -127,7 +170,8 @@ python -m venv .watch-venv
 `Watch.cmd` runs a live read-only check and opens the local report once the
 environment is installed. `output/watch-offers.html` and `watch-offers.json` include
 all verified offers, including those over the alert limits, source coverage and
-exclusion reasons. Check the timestamp; reports are snapshots, not live pages.
+exclusion reasons. When supplied with `--chrono-snapshot`, they also contain a separate
+unverified-hints section. Check the timestamp; reports are snapshots, not live pages.
 `--dry-run` writes only those local reports: no Telegram or notification-state writes.
 To deliberately send locally with configured Telegram environment variables, use
 `--local-state output/watch-state.json`; do not run it alongside the remote notifier

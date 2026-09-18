@@ -8,6 +8,7 @@ from html import escape
 import json
 import os
 from pathlib import Path
+import re
 import sys
 
 from monitor import LocalStore, ServiceError, Telegram, request_json
@@ -35,6 +36,8 @@ def config_from(path):
         raise ServiceError('Mindestpreissenkung muss positiv sein.')
     if not config.get('sources') or len(set(config['sources'])) != len(config['sources']) or any(s not in sources.BASES for s in config['sources']):
         raise ServiceError('Unbekannte oder doppelte Quelle.')
+    if not isinstance(config.get('chrono24_unverified_hints', False), bool):
+        raise ServiceError('Ungültige Einstellung für ungeprüfte Chrono24-Hinweise.')
     return config
 
 
@@ -58,6 +61,12 @@ def prepare_state(state, recipient):
             raise ServiceError('Beschädigter Preisverlauf.')
     if 'health_at' in state:
         sources.money(state['health_at'])
+    hints = state.setdefault('unverified_notified', {})
+    if not isinstance(hints, dict):
+        raise ServiceError('Beschädigter Hinweisverlauf.')
+    for key, timestamp in hints.items():
+        if not re.fullmatch(r'chrono24:\d+', key) or sources.money(timestamp) <= 0:
+            raise ServiceError('Beschädigter Hinweisverlauf.')
     return state
 
 
@@ -126,14 +135,34 @@ def health_message(report, config):
     for c in report['coverage']:
         lines.append(f'{c["source"]}: {c["status"]}, {c["checked"]}/{c["found"]} Angebote geprüft'
                      + (f' — {c["errors"][0]}' if c['errors'] else ''))
+    if report.get('hints'):
+        lines.append(f'{len(report["hints"])} zusätzliche Chrono24-Suchtreffer ohne bestätigten Zustand/Schweden-Versand. '
+                     'Diese zählen nicht als passende Angebote.')
     for condition, label in [('new', 'Neu'), ('used', 'Gebraucht')]:
         rows = [r for r in report['offers'] if r['condition'] == condition]
         if rows:
             row = min(rows, key=lambda r: r['total_sek'])
             approximate = 'ca. ' if row.get('total_estimated') else ''
             lines.append(f'Günstigstes geprüftes Angebot ({label}): {approximate}{row["total_sek"]:g} SEK — {row["source"]}\n{row["url"]}')
-    lines.append('Keine vollständige Marktabdeckung. Unbekannter Versand/Importgesamtpreis wird ausgeschlossen.')
+    lines.append('Keine vollständige Marktabdeckung. Unbekannter Versand/Importgesamtpreis wird aus geprüften Kaufangeboten ausgeschlossen.')
     return '\n'.join(lines)
+
+
+def hint_message(row):
+    from watch_chrono_browser import listing_id
+    if row.get('reference') != sources.REFERENCE or row.get('source') != 'chrono24' or listing_id(row['url']) != row['id']:
+        raise ServiceError('Ungültiger Chrono24-Hinweis.')
+    url = sources.safe_url('chrono24', row['url'])
+    return ('<b>🔎 Chrono24 · ungeprüfter Hinweis</b>\n\n'
+            '<b>Neu im Monitor entdeckt</b> – nicht zwingend gerade inseriert.\n'
+            'Gefunden in der Suche nach Hamilton H36215140.\n\n'
+            f'Suchtreffer (unbestätigt): {escape(row["search_text"][:350])}\n\n'
+            '<b>Kein bestätigtes Kaufangebot.</b> Die Detailprüfung war nicht möglich.\n'
+            'Exakte Referenz und Gebrauchszustand noch zu prüfen; kann auch Neuware sein.\n'
+            'Versand nach Schweden, Versandkosten und Gesamtpreis sind NICHT bestätigt. '
+            'Ein angezeigter Suchpreis kann für ein anderes Lieferland gelten.\n'
+            'Keine Prüfung gegen deine Preisgrenze möglich.\n\n'
+            f'<a href="{escape(url, quote=True)}">Inserat selbst prüfen</a>')
 
 
 def notify(report, config, store, telegram, now):
@@ -158,6 +187,14 @@ def notify(report, config, store, telegram, now):
                 store.save(state)
             except ServiceError:
                 print('WARN: Angebotsbilder konnten nicht versendet werden; maximal drei Versuche.')
+    if config.get('chrono24_unverified_hints', False):
+        for row in report.get('hints', []):
+            if row['id'] in state['unverified_notified'] or row['id'] in state['notified']:
+                continue
+            telegram.send(hint_message(row), html=True)
+            state['unverified_notified'][row['id']] = now
+            store.save(state)
+            sent += 1
     health_key = [(c['source'], c['status']) for c in report['coverage']]
     health_key = json.dumps(health_key)
     if now - state.get('health_at', 0) >= 86400 or health_key != state.get('health_key'):
@@ -177,6 +214,9 @@ def write_report(report, directory):
                     + f'<td><a href="{escape(row["url"], quote=True)}">Angebot</a> {escape(row.get("total_note", ""))}</td></tr>')
     status = escape(json.dumps(report['coverage'], indent=2, ensure_ascii=False))
     excluded = escape(json.dumps(report['excluded'], indent=2, ensure_ascii=False))
+    hints = ''.join(f'<li>{escape(row["search_text"])} — '
+                    f'<a href="{escape(row["url"], quote=True)}">Inserat selbst prüfen</a></li>'
+                    for row in report.get('hints', []))
     html = ('<!doctype html><html lang="de"><meta charset="utf-8"><title>Hamilton H36215140</title>'
             '<style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:20px}td,th{padding:10px;text-align:left}'
             'table{border-collapse:collapse}tr{border-bottom:1px solid #ddd}pre{white-space:pre-wrap}</style>'
@@ -184,7 +224,10 @@ def write_report(report, directory):
             f'<p>Alarmgrenzen inkl. Versand: neu {report["limits"]["new"]:g} / gebraucht {report["limits"]["used"]:g} SEK.</p>'
             '<p>Alle unten stehenden Angebote haben bestätigten Schwedenversand; auch Angebote über der Alarmgrenze.</p>'
             '<table><tr><th>Quelle</th><th>Zustand</th><th>Uhr SEK</th><th>Versand SEK</th><th>Gesamt SEK</th><th>Lieferbarkeit</th><th>Link</th></tr>'
-            + ''.join(rows) + f'</table><h2>Quellenstatus</h2><pre>{status}</pre><h2>Ausgeschlossen</h2><pre>{excluded}</pre></html>')
+            + ''.join(rows) + '</table><h2>Ungeprüfte Chrono24-Hinweise</h2>'
+            '<p>Keine bestätigten Kaufangebote. Referenzdetails, Zustand, Schweden-Versand und Gesamtpreis unbestätigt; '
+            'keine Prüfung gegen die Preisgrenze. Angezeigte Suchpreise können für ein anderes Lieferland gelten.</p>'
+            f'<ul>{hints}</ul><h2>Quellenstatus</h2><pre>{status}</pre><h2>Ausgeschlossen</h2><pre>{excluded}</pre></html>')
     atomic_write(directory / 'watch-offers.html', html)
 
 
@@ -194,15 +237,32 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT / 'output')
     parser.add_argument('--dry-run', action='store_true', help='Live lesen und lokalen Bericht schreiben, ohne Telegram/Statusänderung')
     parser.add_argument('--local-state', type=Path, help='Lokaler statt GitHub-Verlauf')
+    parser.add_argument('--chrono-snapshot', type=Path, help='Frischer Bericht des getrennten Chrono24-Browserschritts')
     args = parser.parse_args()
     try:
         config = config_from(args.config)
-        offers, coverage, excluded = sources.collect(config)
         now = datetime.now(timezone.utc)
+        http_config = dict(config)
+        if args.chrono_snapshot:
+            http_config['sources'] = [s for s in config['sources'] if s != 'chrono24']
+        offers, coverage, excluded = sources.collect(http_config)
+        hints = []
+        if args.chrono_snapshot and 'chrono24' in config['sources']:
+            from watch_chrono_browser import load_snapshot
+            browser = load_snapshot(args.chrono_snapshot, datetime.now(timezone.utc))
+            offers.extend(browser['offers'])
+            coverage.append(browser['coverage'])
+            excluded.extend(browser['excluded'])
+            if config.get('chrono24_unverified_hints', False):
+                hints = browser['hints']
+        offers.sort(key=lambda row: row['total_sek'])
+        coverage.sort(key=lambda row: config['sources'].index(row['source']))
         report = {'checked_at': now.isoformat(), 'limits': config['max_total_sek'], 'offers': offers,
-                  'matches': [o for o in offers if qualifies(o, config)], 'coverage': coverage, 'excluded': excluded}
+                  'matches': [o for o in offers if qualifies(o, config)], 'coverage': coverage, 'excluded': excluded,
+                  'hints': hints}
         write_report(report, args.output)
         print(json.dumps({'coverage': coverage, 'offers': len(offers), 'matches': len(report['matches']),
+                          'unverified_hints': len(hints),
                           'totals_sek': [o['total_sek'] for o in offers]}, ensure_ascii=True))
         if not args.dry_run:
             store = LocalStore(args.local_state) if args.local_state else GitHubStore(os.environ.get('GITHUB_REPOSITORY'), os.environ.get('GITHUB_TOKEN'))
