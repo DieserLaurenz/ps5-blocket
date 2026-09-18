@@ -218,6 +218,15 @@ def hint_message(row):
     return '\n'.join(lines)
 
 
+def preview_message():
+    row = {'id': 'chrono24:48515488', 'source': 'chrono24', 'reference': sources.REFERENCE,
+           'url': 'https://www.chrono24.se/hamilton/mens-h36215140-jazzmaster-performer-auto-38mm--id48515488.htm',
+           'search_text': 'Hamilton Jazzmaster Performer H36215140 11 967 SEK + 220 SEK leverans IT'}
+    body = hint_message(row).replace(offer_link(row['url'], 'Inserat ansehen'),
+                                     offer_link(sources.SEARCHES['chrono24'], 'Chrono24-Suche öffnen'))
+    return '<b>🧪 TEST · Layoutvorschau</b>\n<i>Beispieldaten – kein neues Angebot, kein aktueller Preis.</i>\n\n' + body
+
+
 def notify(report, config, store, telegram, now):
     state = prepare_state(store.load(), telegram.recipient)
     sent = 0
@@ -288,11 +297,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=ROOT / 'watch-config.json')
     parser.add_argument('--output', type=Path, default=ROOT / 'output')
-    parser.add_argument('--dry-run', action='store_true', help='Live lesen und lokalen Bericht schreiben, ohne Telegram/Statusänderung')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--dry-run', action='store_true', help='Live lesen und lokalen Bericht schreiben, ohne Telegram/Statusänderung')
+    mode.add_argument('--test-message', action='store_true', help='Eine markierte Telegram-Layoutvorschau senden; kein Abruf und keine Statusänderung')
     parser.add_argument('--local-state', type=Path, help='Lokaler statt GitHub-Verlauf')
     parser.add_argument('--chrono-snapshot', type=Path, help='Frischer Bericht des getrennten Chrono24-Browserschritts')
     args = parser.parse_args()
     try:
+        if args.test_message:
+            telegram = Telegram(os.environ.get('TELEGRAM_BOT_TOKEN'), os.environ.get('TELEGRAM_CHAT_ID'))
+            telegram.send(preview_message(), html=True)
+            print('Telegram layout test sent: 1; notification history unchanged.')
+            return 0
         config = config_from(args.config)
         now = datetime.now(timezone.utc)
         http_config = dict(config)

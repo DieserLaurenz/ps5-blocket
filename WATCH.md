@@ -194,6 +194,9 @@ total or an input to the budget filter. Shipping-only amounts are not promoted t
 watch prices. Model/condition, Sweden shipping and final-price caveats remain visible.
 Technical source errors remain in the report/logs; Telegram uses short status labels.
 Layout changes apply to future messages and do not clear history or resend listings.
+The manual **Hamilton Telegram Preview** workflow sends one clearly labelled sample
+with `--test-message`. It uses no source fetches or state reads/writes and has read-only
+repository permissions. Sample prices are explicitly not live offers.
 
 ### Schedule and history
 

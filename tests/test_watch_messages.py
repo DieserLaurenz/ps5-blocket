@@ -2,8 +2,9 @@ import copy
 from html.parser import HTMLParser
 from pathlib import Path
 import re
+import sys
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from test_watch import CHRONO, MemoryStore, schema_html
 import watch_monitor as monitor
@@ -113,6 +114,28 @@ class MessageLayoutTests(unittest.TestCase):
         report = {**self.report, 'hints': []}
         monitor.notify(report, self.config, MemoryStore(), bot, 100000)
         bot.send.assert_called_once_with(monitor.health_message(report, self.config), html=True)
+
+    def test_preview_is_labelled_and_links_to_search_not_a_sample_offer(self):
+        text = monitor.preview_message()
+        self.assertIn('TEST · Layoutvorschau', text)
+        self.assertIn('kein aktueller Preis', text)
+        self.assertIn(sources.SEARCHES['chrono24'], text)
+        self.assertNotIn('--id48515488', text)
+        TelegramMarkup(text)
+
+    def test_preview_sends_once_without_fetch_config_or_state(self):
+        with (patch.object(sys, 'argv', ['watch_monitor.py', '--test-message']),
+              patch.object(monitor, 'Telegram') as telegram,
+              patch.object(monitor, 'config_from') as config,
+              patch.object(monitor.sources, 'collect') as collect,
+              patch.object(monitor, 'GitHubStore') as store,
+              patch.object(monitor, 'LocalStore') as local_store,
+              patch.object(monitor, 'write_report') as report,
+              patch('builtins.print')):
+            self.assertEqual(monitor.main(), 0)
+        telegram.return_value.send.assert_called_once_with(monitor.preview_message(), html=True)
+        for mock in (config, collect, store, local_store, report):
+            mock.assert_not_called()
 
 
 if __name__ == '__main__':
