@@ -107,44 +107,84 @@ def qualifies(row, config):
             and row['total_sek'] <= config['max_total_sek'][row['condition']])
 
 
+SOURCE_LABELS = {'chrono24': 'Chrono24', 'uret': 'Uret', 'ebay': 'eBay', 'corsovinci': 'Corso Vinci'}
+COUNTRY_LABELS = {'SE': 'Schweden', 'IT': 'Italien', 'DE': 'Deutschland', 'ES': 'Spanien',
+                  'FR': 'Frankreich', 'NL': 'Niederlande', 'BE': 'Belgien', 'AT': 'Österreich',
+                  'DK': 'Dänemark', 'FI': 'Finnland', 'PL': 'Polen', 'PT': 'Portugal',
+                  'CH': 'Schweiz', 'GB': 'Großbritannien', 'US': 'USA', 'JP': 'Japan'}
+
+
+def amount(value):
+    """German display only; never modifies matching or stored numeric prices."""
+    number = f'{sources.money(value):,.2f}'.translate(str.maketrans(',.', '.,'))
+    return number.removesuffix(',00') + ' SEK'
+
+
+def source_label(source):
+    return escape(SOURCE_LABELS.get(source, source))
+
+
+def offer_link(url, label):
+    return f'<a href="{escape(url, quote=True)}">{escape(label)} ↗</a>'
+
+
 def message(row, config, old=None):
-    label = '⌚ Neues passendes Angebot' if old is None else '📉 Neuer gemeldeter Tiefstpreis'
-    if row['total_sek'] <= config['bargain_total_sek'][row['condition']]:
-        label += ' · unter Schnäppchengrenze'
-    condition = 'Neu/ungetragen laut Anbieter' if row['condition'] == 'new' else 'Gebraucht laut Anbieter'
-    difference = f' (zuvor gemeldet: {old:g} SEK)' if old is not None else ''
+    label = '⌚ Neues Angebot' if old is None else '📉 Neuer Tiefstpreis im Monitor'
+    condition = 'Neu / ungetragen' if row['condition'] == 'new' else 'Gebraucht'
     approximate = 'ca. ' if row.get('total_estimated') else ''
-    return (f'<b>{label}</b> · {escape(row["source"])}\n\n'
-            f'<b>Hamilton H36215140</b>\n{escape(row["title"][:180])}\n'
-            f'💰 <b>{approximate}{row["total_sek"]:g} SEK inkl. Versand</b>{difference}\n'
-            f'Uhr {row["price_sek"]:g} + Versand {row["shipping_sek"]:g} SEK\n'
-            f'🚚 Nach Schweden · Angebotsstandort {escape(row["origin"])}\n'
-            f'{condition}\n{escape(row["condition_text"][:240])}\n'
-            f'Lieferbarkeit: {escape(row["availability"][:240])}\n'
-            f'Lieferumfang/Garantie: {escape(row["scope"][:350])}\n\n'
-            f'{escape(row.get("total_note", ""))}\n'
-            f'<a href="{escape(row["url"], quote=True)}">Angebot öffnen</a>\n'
-            'Anbieterangaben, keine Echtheitsprüfung. Endpreis und Zahlung ohne BankID vor Kauf prüfen. '
-            'SEK-Preise können durch Wechselkurse schwanken.')
+    country = escape(COUNTRY_LABELS.get(row['origin'], row['origin']))
+    lines = [f'<b>{label}</b> · {source_label(row["source"])}', '',
+             '<b>Hamilton Jazzmaster Performer</b>', '<code>H36215140</code> · 38 mm', '',
+             f'<b>{approximate}{amount(row["total_sek"])}</b> inkl. Versand nach Schweden',
+             f'Uhr {amount(row["price_sek"])} · Versand {amount(row["shipping_sek"])}']
+    if old is not None:
+        lines.append(f'↓ {amount(old - row["total_sek"])} seit dem letzten gemeldeten Tiefstpreis ({amount(old)})')
+    if row['total_sek'] <= config['bargain_total_sek'][row['condition']]:
+        lines.append('✦ Unter deiner Schnäppchengrenze')
+    lines += ['', f'<b>{condition}</b> · Standort {country}']
+    if row['condition'] == 'used' and row.get('condition_text'):
+        lines.append(f'Zustand laut Anbieter: {escape(row["condition_text"][:180])}')
+    lines += [f'Lieferbarkeit: {escape(row["availability"][:180])}',
+              f'Lieferumfang: {escape(row["scope"][:250])}', '',
+              offer_link(row['url'], 'Angebot ansehen'), '',
+              '<i>Anbieterangaben, keine Echtheitsprüfung. Endpreis und Zahlung ohne BankID vor Kauf prüfen.</i>']
+    if row.get('total_estimated'):
+        lines.append('<i>Versand umgerechnet; Checkout-Endpreis kann abweichen.</i>')
+    return '\n'.join(lines)
 
 
 def health_message(report, config):
-    lines = ['⌚ Hamilton H36215140 · Tagesstatus',
-             f'Alarm: neu ≤ {config["max_total_sek"]["new"]:g}, gebraucht ≤ {config["max_total_sek"]["used"]:g} SEK inkl. Versand.',
-             f'{len(report["matches"])} passende / {len(report["offers"])} mit bestätigtem Schwedenversand.']
+    matched, checked, hints = len(report['matches']), len(report['offers']), len(report.get('hints', []))
+    lines = ['⌚ <b>Hamilton · Monitor-Status</b>', '<code>H36215140</code>', '',
+             f'<b>{matched} ' + ('passendes Angebot' if matched == 1 else 'passende Angebote') + '</b>',
+             f'{checked} ' + ('Angebot' if checked == 1 else 'Angebote') + ' mit bestätigtem Schweden-Versand']
+    if hints:
+        lines.append(f'{hints} ' + ('ungeprüfter' if hints == 1 else 'ungeprüfte') + ' Chrono24-Suchtreffer · separat')
+    lines += ['', '<b>Quellen</b>']
     for c in report['coverage']:
-        lines.append(f'{c["source"]}: {c["status"]}, {c["checked"]}/{c["found"]} Angebote geprüft'
-                     + (f' — {c["errors"][0]}' if c['errors'] else ''))
-    if report.get('hints'):
-        lines.append(f'{len(report["hints"])} zusätzliche Chrono24-Suchtreffer ohne bestätigten Zustand/Schweden-Versand. '
-                     'Diese zählen nicht als passende Angebote.')
-    for condition, label in [('new', 'Neu'), ('used', 'Gebraucht')]:
+        if c['status'] == 'ok':
+            label = f'🟢 {source_label(c["source"])} · {c["checked"]} geprüft'
+        elif c['source'] == 'chrono24' and c.get('search_readable'):
+            label = f'🟡 Chrono24 · Suchtreffer lesbar, Details eingeschränkt ({c["checked"]}/{c["found"]} geprüft)'
+        elif c['status'] == 'partial':
+            label = f'🟡 {source_label(c["source"])} · teilweise geprüft ({c["checked"]}/{c["found"]})'
+        else:
+            blocked = any('403' in e or '429' in e for e in c.get('errors', []))
+            label = f'🔴 {source_label(c["source"])} · ' + ('Zugriff blockiert' if blocked else 'Abruf fehlgeschlagen')
+        lines.append(label)
+    lines += ['', '<b>Günstigste geprüfte Angebote</b>']
+    for condition, label in [('used', 'Gebraucht'), ('new', 'Neu')]:
         rows = [r for r in report['offers'] if r['condition'] == condition]
         if rows:
             row = min(rows, key=lambda r: r['total_sek'])
             approximate = 'ca. ' if row.get('total_estimated') else ''
-            lines.append(f'Günstigstes geprüftes Angebot ({label}): {approximate}{row["total_sek"]:g} SEK — {row["source"]}\n{row["url"]}')
-    lines.append('Keine vollständige Marktabdeckung. Unbekannter Versand/Importgesamtpreis wird aus geprüften Kaufangeboten ausgeschlossen.')
+            link = offer_link(row['url'], SOURCE_LABELS.get(row['source'], row['source']))
+            lines.append(f'{label}: <b>{approximate}{amount(row["total_sek"])}</b> · {link}')
+        else:
+            lines.append(f'{label}: kein geprüftes Angebot')
+    lines += ['', '<b>Deine Preisgrenzen</b> · inkl. Versand',
+              f'Gebraucht {amount(config["max_total_sek"]["used"])} · Neu {amount(config["max_total_sek"]["new"])}', '',
+              '<i>Suchtreffer sind keine bestätigten Kaufangebote. Keine vollständige Marktabdeckung.</i>']
     return '\n'.join(lines)
 
 
@@ -153,16 +193,29 @@ def hint_message(row):
     if row.get('reference') != sources.REFERENCE or row.get('source') != 'chrono24' or listing_id(row['url']) != row['id']:
         raise ServiceError('Ungültiger Chrono24-Hinweis.')
     url = sources.safe_url('chrono24', row['url'])
-    return ('<b>🔎 Chrono24 · ungeprüfter Hinweis</b>\n\n'
-            '<b>Neu im Monitor entdeckt</b> – nicht zwingend gerade inseriert.\n'
-            'Gefunden in der Suche nach Hamilton H36215140.\n\n'
-            f'Suchtreffer (unbestätigt): {escape(row["search_text"][:350])}\n\n'
-            '<b>Kein bestätigtes Kaufangebot.</b> Die Detailprüfung war nicht möglich.\n'
-            'Exakte Referenz und Gebrauchszustand noch zu prüfen; kann auch Neuware sein.\n'
-            'Versand nach Schweden, Versandkosten und Gesamtpreis sind NICHT bestätigt. '
-            'Ein angezeigter Suchpreis kann für ein anderes Lieferland gelten.\n'
-            'Keine Prüfung gegen deine Preisgrenze möglich.\n\n'
-            f'<a href="{escape(url, quote=True)}">Inserat selbst prüfen</a>')
+    text = row['search_text']
+    # Presentation only: never assign these numbers to a verified offer or its state.
+    price = re.search(r'(?<![\w.,])\d[\d \xa0\u202f]*(?:[,.]\d{1,2})?\s*(?:SEK|kr)\b', text)
+    on_request = bool(re.search(r'Pris (?:på begäran|vid förfrågan)|price on request|Preis auf Anfrage', text, re.I))
+    if on_request or (price and text[:price.start()].rstrip().endswith('+')):
+        price = None  # A shipping-only amount must not become the watch's display price.
+    price_label = amount(sources.sek(price[0])) if price else 'Preis nicht erfasst'
+    if on_request:
+        price_label = 'Preis auf Anfrage'
+    lines = ['🔎 <b>Chrono24 · ungeprüfter Hinweis</b>', '',
+             '<b>Hamilton Jazzmaster Performer</b>', 'Suche <code>H36215140</code>', '',
+             f'<b>{price_label}</b> · Suchpreis, unbestätigt']
+    country = re.search(r'\b([A-Z]{2})\s*$', text)
+    if country and country[1] in COUNTRY_LABELS:
+        lines.append(f'📍 {COUNTRY_LABELS[country[1]]} · laut Suchtreffer')
+    if not price:
+        lines.append(escape(text[:180]))
+    lines += ['', 'Erstmals im Monitor erfasst.', '',
+              '<i>Modell und Zustand ungeprüft – kann auch Neuware sein.\n'
+              'Schweden-Versand und Endpreis NICHT bestätigt; kein Budgetcheck.\n'
+              'Suchpreis kann für ein anderes Lieferland gelten.</i>', '',
+              offer_link(url, 'Inserat ansehen')]
+    return '\n'.join(lines)
 
 
 def notify(report, config, store, telegram, now):
@@ -198,7 +251,7 @@ def notify(report, config, store, telegram, now):
     health_key = [(c['source'], c['status']) for c in report['coverage']]
     health_key = json.dumps(health_key)
     if now - state.get('health_at', 0) >= 86400 or health_key != state.get('health_key'):
-        telegram.send(health_message(report, config))
+        telegram.send(health_message(report, config), html=True)
         state.update(health_at=now, health_key=health_key)
         store.save(state)
     return sent

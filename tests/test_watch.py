@@ -251,6 +251,7 @@ class NotifyTests(unittest.TestCase):
 
     def test_html_escaped(self):
         self.row['title'] = '<script>x</script>'
+        self.row['scope'] = '<script>scope</script>'
         text = monitor.message(self.row, self.config)
         self.assertNotIn('<script>', text)
         self.assertIn('&lt;script&gt;', text)

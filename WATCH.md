@@ -184,6 +184,19 @@ unless you want a separate alert history.
 
 ## Remote operation
 
+### Telegram presentation
+
+Offer alerts, unverified hints and the status summary use compact Telegram HTML:
+clear headings, German-formatted SEK amounts and named links instead of bare URLs.
+Unverified hints show a **Suchpreis, unbestätigt** only when a recognizable SEK price
+is present in the result card. This is display-only, never a validated delivered
+total or an input to the budget filter. Shipping-only amounts are not promoted to
+watch prices. Model/condition, Sweden shipping and final-price caveats remain visible.
+Technical source errors remain in the report/logs; Telegram uses short status labels.
+Layout changes apply to future messages and do not clear history or resend listings.
+
+### Schedule and history
+
 `.github/workflows/watch.yml` is scheduled at minutes 8, 23, 38 and 53. GitHub Actions
 schedules are best-effort and may be delayed or skipped; this is **not** an exact
 15-minute SLA. Public repositories can have schedules disabled after prolonged
