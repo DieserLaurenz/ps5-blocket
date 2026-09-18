@@ -4,5 +4,8 @@
   "recipient": "41898ffa9dda979ed3a7",
   "notified": {},
   "health_at": 1789675855.564901,
-  "health_key": "[[\"chrono24\", \"error\"], [\"uret\", \"ok\"], [\"ebay\", \"error\"], [\"corsovinci\", \"ok\"]]"
+  "health_key": "[[\"chrono24\", \"error\"], [\"uret\", \"ok\"], [\"ebay\", \"error\"], [\"corsovinci\", \"ok\"]]",
+  "unverified_notified": {
+    "chrono24:46867736": 1789748424.480612
+  }
 }
