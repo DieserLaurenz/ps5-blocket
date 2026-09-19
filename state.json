@@ -2,7 +2,11 @@
   "version": 1,
   "recipient": "41898ffa9dda979ed3a7",
   "initialized": true,
-  "tickets": {},
+  "tickets": {
+    "b45e9e1087b67f3570d574fc9f29144964e75068daeb6cec70cd9357cad4c045": [
+      "08346b96027be7e55a753960d2b382a687fa0669d3dbe0e972ac323743df555e"
+    ]
+  },
   "news": {
     "46930": [
       "26dedfd1e656ffb957cae570ab5c9ea847d8b4ae1376f89773c38068acc5546d"
