@@ -3,8 +3,8 @@
   "reference": "H36215140",
   "recipient": "41898ffa9dda979ed3a7",
   "notified": {},
-  "health_at": 1790209992.629352,
-  "health_key": "[[\"chrono24\", \"partial\"], [\"uret\", \"ok\"], [\"ebay\", \"error\"], [\"corsovinci\", \"ok\"]]",
+  "health_at": 1790226975.67412,
+  "health_key": "[[\"chrono24\", \"error\"], [\"uret\", \"ok\"], [\"ebay\", \"error\"], [\"corsovinci\", \"ok\"]]",
   "unverified_notified": {
     "chrono24:46867736": 1789748424.480612,
     "chrono24:48515488": 1789748424.480612,
