@@ -2,7 +2,14 @@
   "version": 1,
   "reference": "H36215140",
   "recipient": "41898ffa9dda979ed3a7",
-  "notified": {},
+  "notified": {
+    "corsovinci:9872203088221": {
+      "lowest_total": 11480.67,
+      "message_id": 110,
+      "photo_attempts": 0,
+      "photo_sent": false
+    }
+  },
   "health_at": 1791331300.81809,
   "health_key": "[[\"chrono24\", \"error\"], [\"uret\", \"ok\"], [\"ebay\", \"error\"], [\"corsovinci\", \"ok\"]]",
   "unverified_notified": {
