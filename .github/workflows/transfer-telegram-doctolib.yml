@@ -1,0 +1,36 @@
+name: Transfer Telegram secrets to private appointment monitor
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  encrypt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: python -m pip install PyNaCl==1.5.0
+      - name: Encrypt for destination repository
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python - <<'PY'
+          import base64, json, os
+          from nacl.public import PublicKey, SealedBox
+          key = PublicKey(base64.b64decode('lk7PJMq2rNStLZ8qe38QWI/6soQflRb7WbQF7n8jRGA='))
+          sealed = SealedBox(key)
+          payload = {}
+          for name in ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']:
+              value = os.environ[name]
+              if not value:
+                  raise RuntimeError('Required secret missing: ' + name)
+              payload[name] = {'key_id': '3380204578043523366', 'encrypted_value': base64.b64encode(sealed.encrypt(value.encode())).decode()}
+          with open('encrypted-secrets.json', 'w') as f:
+              json.dump(payload, f)
+          print('Encrypted both secrets for destination repository public key.')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-telegram-for-doctolib
+          path: encrypted-secrets.json
+          retention-days: 1
