@@ -1,0 +1,27 @@
+[Unit]
+Description=Hamilton H36215140 price monitor
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=hamilton
+Group=hamilton
+WorkingDirectory=/opt/hamilton-watch
+EnvironmentFile=/etc/hamilton-watch.env
+Environment=HOME=/var/lib/hamilton-watch
+Environment=WATCH_CHROME_BINARY=/usr/bin/google-chrome
+Environment=WATCH_BROWSER_BACKEND=playwright
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/bin/sh /opt/hamilton-watch/deploy/watch/run.sh
+StateDirectory=hamilton-watch
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=10min
+MemoryMax=2200M
+CPUQuota=80%
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

@@ -70,6 +70,14 @@ def prepare_state(state, recipient):
     return state
 
 
+class WatchLocalStore(LocalStore):
+    def load(self):
+        state = super().load()
+        if not state:
+            raise ServiceError('Lokaler Uhrenstatus fehlt oder ist leer; kein automatischer Reset.')
+        return state
+
+
 class GitHubStore:
     def __init__(self, repo, token):
         if not repo or not token:
@@ -302,6 +310,7 @@ def main():
     mode.add_argument('--test-message', action='store_true', help='Eine markierte Telegram-Layoutvorschau senden; kein Abruf und keine Statusänderung')
     parser.add_argument('--local-state', type=Path, help='Lokaler statt GitHub-Verlauf')
     parser.add_argument('--chrono-snapshot', type=Path, help='Frischer Bericht des getrennten Chrono24-Browserschritts')
+    parser.add_argument('--ebay-snapshot', type=Path, help='Frischer Bericht des getrennten eBay-Browserschritts')
     args = parser.parse_args()
     try:
         if args.test_message:
@@ -314,6 +323,8 @@ def main():
         http_config = dict(config)
         if args.chrono_snapshot:
             http_config['sources'] = [s for s in config['sources'] if s != 'chrono24']
+        if args.ebay_snapshot:
+            http_config['sources'] = [s for s in http_config['sources'] if s != 'ebay']
         offers, coverage, excluded = sources.collect(http_config)
         hints = []
         if args.chrono_snapshot and 'chrono24' in config['sources']:
@@ -324,6 +335,12 @@ def main():
             excluded.extend(browser['excluded'])
             if config.get('chrono24_unverified_hints', False):
                 hints = browser['hints']
+        if args.ebay_snapshot and 'ebay' in config['sources']:
+            from watch_ebay_browser import load_snapshot as load_ebay_snapshot
+            ebay = load_ebay_snapshot(args.ebay_snapshot, datetime.now(timezone.utc))
+            offers.extend(ebay['offers'])
+            coverage.append(ebay['coverage'])
+            excluded.extend(ebay['excluded'])
         offers.sort(key=lambda row: row['total_sek'])
         coverage.sort(key=lambda row: config['sources'].index(row['source']))
         report = {'checked_at': now.isoformat(), 'limits': config['max_total_sek'], 'offers': offers,
@@ -334,7 +351,7 @@ def main():
                           'unverified_hints': len(hints),
                           'totals_sek': [o['total_sek'] for o in offers]}, ensure_ascii=True))
         if not args.dry_run:
-            store = LocalStore(args.local_state) if args.local_state else GitHubStore(os.environ.get('GITHUB_REPOSITORY'), os.environ.get('GITHUB_TOKEN'))
+            store = WatchLocalStore(args.local_state) if args.local_state else GitHubStore(os.environ.get('GITHUB_REPOSITORY'), os.environ.get('GITHUB_TOKEN'))
             telegram = Telegram(os.environ.get('TELEGRAM_BOT_TOKEN'), os.environ.get('TELEGRAM_CHAT_ID'))
             print(f'Alerts sent: {notify(report, config, store, telegram, now.timestamp())}')
         return 1 if all(c['status'] == 'error' for c in coverage) else 0

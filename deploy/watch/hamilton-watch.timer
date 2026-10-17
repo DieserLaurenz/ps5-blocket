@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Hamilton watch offers every 15 minutes
+
+[Timer]
+OnCalendar=*-*-* *:10/15:00
+RandomizedDelaySec=15
+Persistent=true
+Unit=hamilton-watch.service
+
+[Install]
+WantedBy=timers.target

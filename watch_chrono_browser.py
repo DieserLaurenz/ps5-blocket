@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
@@ -165,13 +166,23 @@ def main():
     snapshot = {'version': 1, 'reference': sources.REFERENCE,
                 'checked_at': datetime.now(timezone.utc).isoformat(), 'search': {}, 'details': []}
     try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=False)
-            try:
+        backend = os.environ.get('WATCH_BROWSER_BACKEND', 'playwright')
+        if backend == 'camoufox':
+            from camoufox.sync_api import Camoufox
+            with Camoufox(headless=False, os='linux', locale='sv-SE') as browser:
                 capture(browser, snapshot)
-            finally:
-                browser.close()
+        elif backend == 'playwright':
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=False,
+                    executable_path=os.environ.get('WATCH_CHROME_BINARY') or None,
+                    chromium_sandbox=bool(os.environ.get('WATCH_CHROME_BINARY')))
+                try:
+                    capture(browser, snapshot)
+                finally:
+                    browser.close()
+        else:
+            raise ValueError('Unsupported browser backend')
     except Exception as exc:
         snapshot['error'] = type(exc).__name__  # Never log raw HTML, tokens or cookies.
     result = analyze(snapshot)

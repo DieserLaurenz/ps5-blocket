@@ -1,8 +1,7 @@
 name: Hamilton Watch
 
 on:
-  schedule:
-    - cron: '8,23,38,53 * * * *'
+  # Production scheduling moved to the HostBrr systemd timer.
   workflow_dispatch:
     inputs:
       dry_run:

@@ -1,0 +1,3 @@
+-r ../../requirements-watch.txt
+playwright==1.62.0
+camoufox==0.5.8

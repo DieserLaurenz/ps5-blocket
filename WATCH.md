@@ -3,6 +3,65 @@
 Independent watch alerts in the existing Telegram chat. No changes to PS5/IFK filtering,
 secrets or notification histories. Watches are new/unworn **and** used.
 
+## VPS operation (17 October 2026)
+
+Production now runs on the HostBrr VPS as `hamilton-watch.timer`, every 15 minutes
+(minutes 10, 25, 40, 55, with up to 15 seconds jitter). GitHub's `Hamilton Watch`
+workflow is disabled, `WATCH_MONITOR_ENABLED=false`, and its cron trigger was removed.
+Other monitors and the test workflow are unchanged.
+
+Code: `/opt/hamilton-watch`; isolated Python environment: `.venv`; service user:
+`hamilton`. `deploy/watch/install.sh` installs the environment and units but does not
+enable notifications. `deploy/watch/run.sh` captures Chrono24 and eBay sequentially,
+then checks the retailer sources and evaluates all snapshots.
+The Chrono24 browser uses Playwright 1.62.0 and installed Google Chrome under
+Xvfb, with its sandbox enabled (`WATCH_BROWSER_BACKEND=playwright`);
+notification credentials are removed from the browser subprocess environment.
+eBay uses Camoufox 0.5.8 / Firefox 156.0.1-beta.36, also without notification secrets.
+For Chrono24, Camoufox is available only as a manual diagnostic
+(`WATCH_BROWSER_BACKEND=camoufox`), not an automatic fallback. The installer provisions
+the required Firefox browser and fpgen model. Chrome and Firefox run sequentially;
+the complete service has a 2.2 GB memory ceiling and a ten-minute timeout.
+
+Live VPS checks on 17 October: **Uret and Corso Vinci verified successfully**.
+Both Playwright and undetected-chromedriver read five Chrono24 search results but
+could not verify the first detail page, so Chrono24 remains search-only with explicitly
+unverified hints. Moving to the VPS did not resolve Chrono24's detail-page block.
+Camoufox/Firefox also returned HTTP 403 ("Vänta...")
+on the search page, as did a separate direct HTTP test using the Chrome 142 profile.
+No CAPTCHA solving or proxy rotation is used.
+
+eBay's direct HTTP adapter is still unreliable (403/unrecognized pages), but Camoufox
+successfully loaded its search and three individually tested item pages with HTTP 200.
+The VPS now uses this browser path. The search parser skips eBay's placeholder advert
+and unrelated recommendations. Main-item reference numbers come from the visible item
+specifics; item IDs are not mistaken for model SKUs. Explicit non-EU item locations are
+excluded under the existing import policy. A Netherlands/USD shipping quote is never
+treated as Sweden/SEK: missing Sweden shipping or SEK pricing remains incomplete coverage.
+No unverified eBay hints or currency conversions were added.
+
+Each eBay run checks the first search page and at most five details. Missing, blocked,
+redirected or stale snapshots report errors, and skipped details report partial coverage.
+
+Telegram credentials are in `/etc/hamilton-watch.env` (root only, mode 0600).
+History was copied from `watch-state:watch-state.json` after disabling Actions, with
+the recipient hash verified. Active history is now `/var/lib/hamilton-watch/watch-state.json`;
+the old GitHub branch is an archive, not a live mirror. A migration backup is retained
+on the server. Never reset the state or re-enable the Actions notifier alongside the
+server: doing so can duplicate alerts. The service refuses to run with missing/empty
+history. Reports are in `/var/lib/hamilton-watch/output`.
+
+```sh
+systemctl list-timers hamilton-watch.timer --no-pager
+journalctl -u hamilton-watch.service -n 30 --no-pager
+systemctl disable --now hamilton-watch.timer  # pause
+systemctl enable --now hamilton-watch.timer  # resume
+```
+
+The historical GitHub access results below describe the old deployment; VPS source
+coverage is recorded in each live report. A running timer alone does not mean that
+every source is accessible.
+
 ## Price policy
 
 Research snapshot: 14 September 2026. These are adjustable buying targets, **not a
@@ -43,12 +102,12 @@ about 12,361 SEK when fetched with Sweden as the actual destination.
   items if returned. Parse the product's Angular server-rendered state and visible
   Sweden selector/shipping quote. A product that is orderable but not in stock is
   labelled as such. Removed items (HTTP 410) are not live stock.
-- **eBay:** experimental public-page adapter, **not verified operational**. Current
-  probes encountered HTTP 403 or unrecognized responses. The shared strict parser
-  only admits an exact-reference main product with explicit SE shipping and a SEK
-  total. Most eBay pages may not expose those fields. It appears as failed/limited
-  coverage, never as a reliable empty market. An authorized Browse API integration
-  would need separate eBay developer credentials and is not included.
+- **eBay:** the VPS uses Camoufox for public search and item pages. Verified price
+  alerts require an exact-reference main product, acceptable condition, EU item
+  location, explicit Sweden shipping and a SEK total. Many pages show another
+  destination or currency and therefore cannot support a verified alert. These
+  limitations appear in coverage reports. Non-EU items are explicitly excluded.
+  No search-price alerts are sent for eBay. A Browse API integration is not included.
 - **Corso Vinci:** direct retailer product, not the Chrono24 listing. Require exact
   SKU, orderable main-product form, matching visible price and variant price,
   storefront country `SE` and currency `SEK`. The product page includes its
@@ -156,7 +215,7 @@ and payment without Swedish BankID before buying. The monitor needs no BankID,
 but cannot guarantee a seller/payment provider never requests identification.
 
 Only the first search page and up to 25 HTTP detail pages per source (five in the
-Chrono24 browser step, fewer on a block) are checked. Detected
+Chrono24 browser step and five in the eBay browser step, fewer on a block) are checked. Detected
 pagination/limits generate a partial-coverage warning. Seller relists can have new
 IDs; cross-platform duplicate watches are not automatically equated. Broken site
 formats are reported, not bypassed. Remote access may differ from local access.
@@ -178,7 +237,9 @@ all verified offers, including those over the alert limits, source coverage and
 exclusion reasons. When supplied with `--chrono-snapshot`, they also contain a separate
 unverified-hints section. Check the timestamp; reports are snapshots, not live pages.
 `--dry-run` writes only those local reports: no Telegram or notification-state writes.
-To deliberately send locally with configured Telegram environment variables, use
+To deliberately send locally with configured Telegram environment variables, first
+provision a valid state file (migrate the existing history, or explicitly initialize
+with `empty_state()` for a genuinely new monitor), then use
 `--local-state output/watch-state.json`; do not run it alongside the remote notifier
 unless you want a separate alert history.
 
@@ -200,16 +261,17 @@ repository permissions. Sample prices are explicitly not live offers.
 
 ### Schedule and history
 
-`.github/workflows/watch.yml` is scheduled at minutes 8, 23, 38 and 53. GitHub Actions
+Previously, `.github/workflows/watch.yml` was scheduled at minutes 8, 23, 38 and 53. GitHub Actions
 schedules are best-effort and may be delayed or skipped; this is **not** an exact
 15-minute SLA. Public repositories can have schedules disabled after prolonged
 inactivity. A daily heartbeat helps identify problems while the workflow runs, but
 cannot report the scheduler itself stopping. Check Actions if heartbeats stop.
 
-The repository variable `WATCH_MONITOR_ENABLED=true` enables notifications and
-scheduled checks. Set it to `false` to stop them. Manual `dry_run=true` works even
-when disabled. Existing `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` secrets are reused.
-Durable state lives at `watch-state:watch-state.json`, independently of other bots.
+For the old workflow, repository variable `WATCH_MONITOR_ENABLED=true` enables notifications.
+It is now `false` and the workflow itself is disabled. Manual dry runs require explicitly
+re-enabling the workflow; keep the variable false. Existing `TELEGRAM_BOT_TOKEN` and
+`TELEGRAM_CHAT_ID` secrets are retained. Archived state lives at
+`watch-state:watch-state.json`, independently of other bots.
 Provision this file with the result of `watch_monitor.empty_state()` before the first
 notifying run. Missing/corrupt remote state is an error, never an automatic reset.
 

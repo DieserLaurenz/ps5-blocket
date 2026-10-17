@@ -162,6 +162,61 @@ def parse_schema(source, html, url):
             'native_price': details.get('Pris', '')[:100]}
 
 
+def parse_ebay(html, url):
+    """Use eBay's visible item specifics; never treat an item ID as a model SKU."""
+    doc = Document(html).root
+    candidates = [p for value in script_json(doc, script_type='application/ld+json') for p in products(value)]
+    if len(candidates) != 1:
+        raise ValueError('Single eBay main product missing')
+    product = json.loads(json.dumps(candidates[0]))
+    refs = []
+    for node in doc.find(cls='ux-layout-section-evo__col'):
+        labels, values = node.find(tag='dt'), node.find(tag='dd')
+        if len(labels) == len(values) == 1 and labels[0].text() == 'Reference Number':
+            refs.append(values[0].text().upper())
+    if not refs:
+        return parse_schema('ebay', html, url)  # Older schema-complete pages.
+    if set(refs) != {REFERENCE}:
+        raise Ineligible('Referenz nicht exakt bestätigt')
+    product['sku'] = REFERENCE
+    offer = product.get('offers')
+    if not isinstance(offer, dict) or safe_url('ebay', offer.get('url', '')) != safe_url('ebay', url):
+        raise ValueError('Main eBay offer missing')
+    locations = set()
+    for shipping in doc.find(cls='ux-labels-values--shipping'):
+        for node in shipping.find(tag='div'):
+            match = re.fullmatch(r'Located in: (.{1,250})', node.text())
+            if match:
+                locations.add(match[1].rsplit(',', 1)[-1].strip())
+    if len(locations) != 1:
+        raise ValueError('eBay item location unknown')
+    country = locations.pop()
+    non_eu = {'United States', 'Japan', 'United Kingdom', 'China', 'Hong Kong',
+              'Switzerland', 'Norway', 'Canada', 'Australia', 'India', 'Turkey'}
+    if country in non_eu:
+        raise Ineligible('Artikelstandort außerhalb EU: ' + country)
+    countries = dict(zip(
+        ('Austria|Belgium|Bulgaria|Croatia|Cyprus|Czech Republic|Denmark|Estonia|Finland|France|Germany|Greece|Hungary|Ireland|Italy|Latvia|Lithuania|Luxembourg|Malta|Netherlands|Poland|Portugal|Romania|Slovakia|Slovenia|Spain|Sweden').split('|'),
+        'AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE'.split()))
+    if country not in countries:
+        raise ValueError('eBay item country not recognized')
+    offer['availableAtOrFrom'] = {'address': {'addressCountry': countries[country]}}
+    shipping = offer.get('shippingDetails', [])
+    shipping = shipping if isinstance(shipping, list) else [shipping]
+    for row in shipping:
+        destination = row.get('shippingDestination', {})
+        if destination.get('addressCountry') == 'SWE':
+            destination['addressCountry'] = 'SE'
+    if not any(row.get('shippingDestination', {}).get('addressCountry') == 'SE' for row in shipping):
+        raise ValueError('eBay Sweden shipping not confirmed; no price alert')
+    if offer.get('priceCurrency') != 'SEK':
+        raise ValueError('eBay SEK total unavailable; no price alert')
+    for photo in product.get('image', []):
+        if isinstance(photo, dict) and 'url' in photo:
+            photo['contentUrl'] = photo['url']
+    return parse_schema('ebay', '<script type="application/ld+json">' + json.dumps(product) + '</script>', url)
+
+
 def parse_uret(html, url):
     doc = Document(html).root
     url = safe_url('uret', url)
@@ -322,6 +377,12 @@ def listing_links(source, html):
         for a in doc.find(tag='a'):
             href = a.attrs.get('href', '')
             if re.search(pattern, href):
+                if source == 'ebay':
+                    # Ignore eBay's placeholder advert, cross-domain links and
+                    # unrelated recommendations before inspecting real listings.
+                    if (urlsplit(urljoin(BASES[source], href)).hostname != 'www.ebay.com'
+                            or not re.search(r'\bH36215140\b', a.text(), re.I)):
+                        continue
                 links.append(safe_url(source, href))
         if not links:
             # A challenge/redesign must never silently look like a successful empty search.
@@ -348,7 +409,8 @@ def collect(config, client_factory=Client):
                 try:
                     html = client.get(url)
                     row = (parse_corso(html) if source == 'corsovinci' else parse_uret(html, url)
-                           if source == 'uret' else parse_schema(source, html, url))
+                           if source == 'uret' else parse_ebay(html, url)
+                           if source == 'ebay' else parse_schema(source, html, url))
                     offers.append(row)
                     status['checked'] += 1
                 except Ineligible as exc:
