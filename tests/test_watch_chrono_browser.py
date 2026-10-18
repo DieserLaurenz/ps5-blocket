@@ -75,6 +75,38 @@ class SearchTests(unittest.TestCase):
 
 
 class SnapshotTests(unittest.TestCase):
+    def test_http_capture_uses_same_strict_validation(self):
+        session = Mock()
+        session.__enter__ = Mock(return_value=session)
+        session.__exit__ = Mock(return_value=False)
+        session.get.side_effect = [
+            Mock(url=sources.SEARCHES['chrono24'], status_code=200, text=search_html(), content=b'search'),
+            Mock(url=CHRONO, status_code=200, text=schema_html(), content=b'detail')]
+        data = browser.new_snapshot()
+        with patch.object(browser.time, 'sleep'):
+            browser.capture_http(data, Mock(return_value=session))
+        result = browser.analyze(data)
+        self.assertEqual(result['coverage']['status'], 'ok')
+        self.assertEqual(len(result['offers']), 1)
+        self.assertEqual(result['coverage']['mode'], 'curl_cffi/chrome150')
+
+    def test_http_block_stops_without_fetching_details(self):
+        session = Mock()
+        session.__enter__ = Mock(return_value=session)
+        session.__exit__ = Mock(return_value=False)
+        session.get.return_value = Mock(url=sources.SEARCHES['chrono24'], status_code=403,
+                                       text=search_html(), content=b'blocked')
+        data = browser.new_snapshot()
+        browser.capture_http(data, Mock(return_value=session))
+        self.assertEqual(session.get.call_count, 1)
+        self.assertEqual(browser.analyze(data)['coverage']['status'], 'error')
+
+    def test_failed_fallback_does_not_discard_verified_offers(self):
+        primary = snapshot(detail())
+        fallback = snapshot(detail(403))
+        self.assertIs(browser.prefer_snapshot(primary, fallback), primary)
+        self.assertIs(browser.prefer_snapshot(fallback, primary), primary)
+
     def test_search_success_detail_blocked_is_hint_not_offer(self):
         report = browser.analyze(snapshot(detail(403)))
         self.assertEqual(report['offers'], [])

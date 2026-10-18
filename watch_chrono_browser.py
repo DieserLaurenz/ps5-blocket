@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import time
 from urllib.parse import urlsplit
 
 from scraper import atomic_write
@@ -59,7 +60,7 @@ def search_candidates(html):
 def analyze(snapshot):
     """Re-validate public HTML; search-card prices never become verified totals."""
     coverage = {'source': 'chrono24', 'status': 'error', 'checked': 0, 'found': 0,
-                'errors': [], 'mode': 'browser', 'search_readable': False}
+                'errors': [], 'mode': snapshot.get('backend', 'browser'), 'search_readable': False}
     result = {'offers': [], 'hints': [], 'excluded': [], 'coverage': coverage}
     search = snapshot.get('search', {})
     if (search.get('url') != sources.SEARCHES['chrono24'] or
@@ -159,14 +160,63 @@ def capture(browser, snapshot):
         context.close()
 
 
+def capture_http(snapshot, session_factory=None):
+    """Bounded public-page capture; the normal strict analyzer remains authoritative."""
+    if session_factory is None:
+        from curl_cffi.requests import Session
+        session_factory = Session
+    snapshot['backend'] = 'curl_cffi/chrome150'
+    with session_factory(impersonate='chrome150', timeout=25,
+                         headers={'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8'}) as session:
+        def fetch(url):
+            response = session.get(url, allow_redirects=False)
+            if len(response.content) > 8_000_000:
+                raise ValueError('HTTP page too large')
+            return {'url': url, 'final_url': sources.safe_url('chrono24', response.url),
+                    'http_status': response.status_code, 'html': response.text}
+        snapshot['search'] = fetch(sources.SEARCHES['chrono24'])
+        if snapshot['search']['http_status'] != 200:
+            return
+        candidates, _ = search_candidates(snapshot['search']['html'])
+        for candidate in candidates[:DETAIL_LIMIT]:
+            time.sleep(3)
+            detail = fetch(candidate['url'])
+            snapshot['details'].append(detail)
+            if detail['http_status'] in (403, 429):
+                break
+
+
+def new_snapshot():
+    return {'version': 1, 'reference': sources.REFERENCE,
+            'checked_at': datetime.now(timezone.utc).isoformat(), 'search': {}, 'details': []}
+
+
+def prefer_snapshot(primary, fallback):
+    """A failed fallback must not discard successfully checked current offers."""
+    def score(snapshot):
+        result = analyze(snapshot)
+        coverage = result['coverage']
+        return (coverage['status'] == 'ok', coverage['checked'],
+                coverage['search_readable'], len(result['offers']))
+    return fallback if score(fallback) > score(primary) else primary
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=Path('output/chrono-browser.json'))
     args = parser.parse_args()
-    snapshot = {'version': 1, 'reference': sources.REFERENCE,
-                'checked_at': datetime.now(timezone.utc).isoformat(), 'search': {}, 'details': []}
+    snapshot = new_snapshot()
+    primary = None
     try:
         backend = os.environ.get('WATCH_BROWSER_BACKEND', 'playwright')
+        if backend in ('auto', 'curl_cffi'):
+            try:
+                capture_http(snapshot)
+            except Exception as exc:
+                snapshot['error'] = type(exc).__name__
+            if backend == 'auto' and analyze(snapshot)['coverage']['status'] != 'ok':
+                primary, snapshot = snapshot, new_snapshot()
+                backend = 'playwright'
         if backend == 'camoufox':
             from camoufox.sync_api import Camoufox
             with Camoufox(headless=False, os='linux', locale='sv-SE') as browser:
@@ -181,10 +231,12 @@ def main():
                     capture(browser, snapshot)
                 finally:
                     browser.close()
-        else:
+        elif backend not in ('auto', 'curl_cffi'):
             raise ValueError('Unsupported browser backend')
     except Exception as exc:
         snapshot['error'] = type(exc).__name__  # Never log raw HTML, tokens or cookies.
+    if primary is not None:
+        snapshot = prefer_snapshot(primary, snapshot)
     result = analyze(snapshot)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(args.output, json.dumps(snapshot, ensure_ascii=True))

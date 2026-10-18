@@ -3,7 +3,7 @@
 Independent watch alerts in the existing Telegram chat. No changes to PS5/IFK filtering,
 secrets or notification histories. Watches are new/unworn **and** used.
 
-## VPS operation (17 October 2026)
+## VPS operation (18 October 2026)
 
 Production now runs on the HostBrr VPS as `hamilton-watch.timer`, every 15 minutes
 (minutes 10, 25, 40, 55, with up to 15 seconds jitter). GitHub's `Hamilton Watch`
@@ -14,26 +14,31 @@ Code: `/opt/hamilton-watch`; isolated Python environment: `.venv`; service user:
 `hamilton`. `deploy/watch/install.sh` installs the environment and units but does not
 enable notifications. `deploy/watch/run.sh` captures Chrono24 and eBay sequentially,
 then checks the retailer sources and evaluates all snapshots.
-The Chrono24 browser uses Playwright 1.62.0 and installed Google Chrome under
-Xvfb, with its sandbox enabled (`WATCH_BROWSER_BACKEND=playwright`);
-notification credentials are removed from the browser subprocess environment.
+Chrono24 first uses curl_cffi 0.16.3 with its Chrome 150 profile. If strict analysis
+reports incomplete coverage, one Playwright/Google Chrome capture runs under Xvfb
+with its sandbox enabled (`WATCH_BROWSER_BACKEND=auto`). The more complete current
+snapshot is retained, so a blocked fallback cannot discard verified HTTP offers.
+The HTTP capture checks at most five details, spaces requests by three seconds and
+stops on 403/429. There is no repeated profile rotation inside a scheduled run.
+Notification credentials are removed from the capture subprocess environment.
 eBay uses Camoufox 0.5.8 / Firefox 156.0.1-beta.36, also without notification secrets.
 For Chrono24, Camoufox is available only as a manual diagnostic
 (`WATCH_BROWSER_BACKEND=camoufox`), not an automatic fallback. The installer provisions
 the required Firefox browser and fpgen model. Chrome and Firefox run sequentially;
 the complete service has a 2.2 GB memory ceiling and a ten-minute timeout.
 
-Live VPS checks on 17 October: **Uret and Corso Vinci verified successfully**.
-Both Playwright and undetected-chromedriver read five Chrono24 search results but
-could not verify the first detail page, so Chrono24 remains search-only with explicitly
-unverified hints. Moving to the VPS did not resolve Chrono24's detail-page block.
-Camoufox/Firefox also returned HTTP 403 ("Vänta...")
-on the search page, as did a separate direct HTTP test using the Chrome 142 profile.
+Live VPS checks on 18 October: **Uret and Corso Vinci verified successfully**.
+Chrono24's browser access was intermittent overnight. The new curl_cffi capture
+retrieved the search and all five detail pages; three passed the existing strict
+Sweden-price and EU-origin checks. This is a successful live check, not a guarantee
+against future blocking. Unverified hints remain separate when details fail.
 No CAPTCHA solving or proxy rotation is used.
 
-eBay's direct HTTP adapter is still unreliable (403/unrecognized pages), but Camoufox
-successfully loaded its search and three individually tested item pages with HTTP 200.
-The VPS now uses this browser path. The search parser skips eBay's placeholder advert
+eBay remains intermittent: Camoufox loaded search and details on 17 October, but
+on 18 October it returned 403, as did curl_cffi 0.16.3 with Chrome 150, Firefox 147
+and Safari 26.0.1 profiles, HTTP/1.1, persistent Chrome/Firefox sessions via the
+homepage, and nodriver. These unsuccessful experiments were not substituted for
+the production Camoufox path. The search parser skips eBay's placeholder advert
 and unrelated recommendations. Main-item reference numbers come from the visible item
 specifics; item IDs are not mistaken for model SKUs. Explicit non-EU item locations are
 excluded under the existing import policy. A Netherlands/USD shipping quote is never
