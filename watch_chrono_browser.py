@@ -205,6 +205,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=Path('output/chrono-browser.json'))
     args = parser.parse_args()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     snapshot = new_snapshot()
     primary = None
     try:
@@ -214,6 +215,7 @@ def main():
                 capture_http(snapshot)
             except Exception as exc:
                 snapshot['error'] = type(exc).__name__
+            atomic_write(args.output, json.dumps(snapshot, ensure_ascii=True))
             if backend == 'auto' and analyze(snapshot)['coverage']['status'] != 'ok':
                 primary, snapshot = snapshot, new_snapshot()
                 backend = 'playwright'

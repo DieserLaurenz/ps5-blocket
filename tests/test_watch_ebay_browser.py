@@ -33,6 +33,17 @@ def snapshot(html=None):
 
 
 class EbayBrowserTests(unittest.TestCase):
+    def test_seven_results_can_all_be_checked(self):
+        data = snapshot()
+        urls = [URL.replace('800778739305', str(800778739305 + i)) for i in range(7)]
+        data['search']['html'] = ''.join(f'<a href="{url}">Hamilton H36215140</a>' for url in urls)
+        data['details'] = [{'url': url, 'final_url': url, 'http_status': 200,
+                            'html': ebay_html(country='United States').replace(URL, url)} for url in urls]
+        result = analyze(data)
+        self.assertEqual(result['coverage']['status'], 'ok')
+        self.assertEqual(result['coverage']['checked'], 7)
+        self.assertEqual(len(result['excluded']), 7)
+
     def test_verified_reference_and_sweden_total(self):
         row = sources.parse_ebay(ebay_html(), URL)
         self.assertEqual((row['reference'], row['origin'], row['total_sek']), ('H36215140', 'DE', 11100))
@@ -60,6 +71,13 @@ class EbayBrowserTests(unittest.TestCase):
         self.assertEqual(analyze(data)['coverage']['status'], 'error')
         data['details'] = []
         self.assertEqual(analyze(data)['coverage']['status'], 'error')
+
+    def test_interrupted_capture_preserves_checked_offers_but_is_partial(self):
+        data = snapshot()
+        data['error'] = 'CaptureIncomplete'
+        result = analyze(data)
+        self.assertEqual(len(result['offers']), 1)
+        self.assertEqual(result['coverage']['status'], 'partial')
 
     def test_unrelated_details_rejected(self):
         data = snapshot()

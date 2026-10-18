@@ -25,7 +25,9 @@ eBay uses Camoufox 0.5.8 / Firefox 156.0.1-beta.36, also without notification se
 For Chrono24, Camoufox is available only as a manual diagnostic
 (`WATCH_BROWSER_BACKEND=camoufox`), not an automatic fallback. The installer provisions
 the required Firefox browser and fpgen model. Chrome and Firefox run sequentially;
-the complete service has a 2.2 GB memory ceiling and a ten-minute timeout.
+the complete service has a 2.2 GB memory ceiling and a twelve-minute timeout.
+Chrono24 capture is bounded to three minutes and eBay to six, leaving time for the
+healthy retailers and notification processing even when a browser stalls.
 
 Live VPS checks on 18 October: **Uret and Corso Vinci verified successfully**.
 Chrono24's browser access was intermittent overnight. The new curl_cffi capture
@@ -45,8 +47,17 @@ excluded under the existing import policy. A Netherlands/USD shipping quote is n
 treated as Sweden/SEK: missing Sweden shipping or SEK pricing remains incomplete coverage.
 No unverified eBay hints or currency conversions were added.
 
-Each eBay run checks the first search page and at most five details. Missing, blocked,
+Each eBay run checks the first search page and at most ten details. Missing, blocked,
 redirected or stale snapshots report errors, and skipped details report partial coverage.
+The eBay capture writes an explicitly incomplete checkpoint after each page, so an
+interrupted browser cannot lose all previously checked details or claim full coverage.
+`--profile-dir` optionally retains a dedicated anonymous browser profile and one
+Camoufox-generated identity across runs. Both stay in the private service state
+directory, never in Git or the report. No user browser cookies or logins are copied.
+The VPS launcher enables it at `/var/lib/hamilton-watch/ebay-profile`. The first live
+test checked all seven search results successfully; none met the existing offer
+validation rules. Access can still be blocked in future; per-run coverage remains
+the authority, and failures never count as an empty result set.
 
 Telegram credentials are in `/etc/hamilton-watch.env` (root only, mode 0600).
 History was copied from `watch-state:watch-state.json` after disabling Actions, with
