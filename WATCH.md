@@ -13,7 +13,7 @@ Other monitors and the test workflow are unchanged.
 Code: `/opt/hamilton-watch`; isolated Python environment: `.venv`; service user:
 `hamilton`. `deploy/watch/install.sh` installs the environment and units but does not
 enable notifications. `deploy/watch/run.sh` captures Chrono24 and eBay sequentially,
-then checks the retailer sources and evaluates all snapshots.
+then captures the four discovery sources, checks the retailer sources and evaluates all snapshots.
 Chrono24 first uses curl_cffi 0.16.3 with its Chrome 150 profile. If strict analysis
 reports incomplete coverage, one Playwright/Google Chrome capture runs under Xvfb
 with its sandbox enabled (`WATCH_BROWSER_BACKEND=auto`). The more complete current
@@ -25,9 +25,40 @@ eBay uses Camoufox 0.5.8 / Firefox 156.0.1-beta.36, also without notification se
 For Chrono24, Camoufox is available only as a manual diagnostic
 (`WATCH_BROWSER_BACKEND=camoufox`), not an automatic fallback. The installer provisions
 the required Firefox browser and fpgen model. Chrome and Firefox run sequentially;
-the complete service has a 2.2 GB memory ceiling and a twelve-minute timeout.
+the complete service has a 2.2 GB memory ceiling and a fourteen-minute timeout.
 Chrono24 capture is bounded to three minutes and eBay to six, leaving time for the
 healthy retailers and notification processing even when a browser stalls.
+
+### Additional discovery sources (18 October 2026)
+
+`watch_discovery.py` captures Montredo, Prisjakt, Klocksnack and EveryWatch with
+curl_cffi. One Playwright/Chrome fallback under Xvfb is available for EveryWatch's
+public page. This step is bounded to 150 seconds, runs without notification secrets,
+and checkpoints `/var/lib/hamilton-watch/discovery.json`. Missing, invalid or
+older-than-30-minute snapshots cannot produce alerts. The normal 15-minute timer
+includes these sources; no extra service, account or paid subscription is needed.
+
+- **Montredo:** fixed H36215140 product, explicit Swedish shop context, visible EUR
+  price and ordering availability. The site does not supply a confirmed SEK delivered
+  total, so this is a hint, not a budget-qualified offer.
+- **Prisjakt:** the exact-reference product comparison and its in-stock merchant
+  links. Aggregator prices remain unverified until checked at the merchant.
+- **Klocksnack:** first three recent sale-forum pages, up to five Hamilton candidate
+  threads per run. Exact H36215140 must appear in the first post. Wanted, closed,
+  sold and accessory categories are excluded. This does not search the whole archive;
+  vague titles without Hamilton/reference can be missed.
+- **EveryWatch:** only visible cards in the active **For Sale** tab for H36215140.
+  Locked premium cards and hidden application data are not read. Four of eight
+  active listings were publicly readable in the local live check. Counts change.
+
+Each new discovery ID gets one clearly labelled Telegram hint, even if its displayed
+price is above the budget. Native EUR/USD prices are never treated as SEK, no Sweden
+shipping is invented, and no budget qualification occurs. These discovery hints are
+deduplicated separately from verified offers and existing Chrono24 hints; adding the
+sources preserves history. They currently notify on **new IDs**, not price changes.
+Cross-platform duplicates (for example Corso Vinci on EveryWatch) are not merged.
+Reports mark these sources as partial discovery coverage even when fetching succeeds.
+Only verified offers continue using the existing 100 SEK price-drop notifications.
 
 Live VPS checks on 18 October: **Uret and Corso Vinci verified successfully**.
 Chrono24's browser access was intermittent overnight. The new curl_cffi capture
@@ -243,7 +274,8 @@ Python 3.10+. The isolated environment avoids changing dependencies for PS5/IFK.
 ```powershell
 python -m venv .watch-venv
 .watch-venv\Scripts\python.exe -m pip install -r requirements-watch.txt
-.watch-venv\Scripts\python.exe watch_monitor.py --dry-run
+.watch-venv\Scripts\python.exe watch_discovery.py --http-only --output output\discovery.json
+.watch-venv\Scripts\python.exe watch_monitor.py --dry-run --discovery-snapshot output\discovery.json
 .watch-venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 

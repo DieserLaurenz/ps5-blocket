@@ -15,7 +15,9 @@ from monitor import ServiceError
 REFERENCE = 'H36215140'
 EU = set('AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE'.split())
 BASES = {'chrono24': 'https://www.chrono24.se', 'uret': 'https://www.uret.se', 'ebay': 'https://www.ebay.com',
-         'corsovinci': 'https://www.corsovinci.com'}
+         'corsovinci': 'https://www.corsovinci.com', 'montredo': 'https://www.montredo.com',
+         'prisjakt': 'https://www.prisjakt.nu', 'klocksnack': 'https://klocksnack.se',
+         'everywatch': 'https://everywatch.com'}
 SEARCHES = {'chrono24': BASES['chrono24'] + '/hamilton/ref-h36215140.htm',
             'uret': BASES['uret'] + '/search/H36215140',
             'ebay': BASES['ebay'] + '/sch/i.html?_nkw=H36215140&_sop=15&_stposCountry=SE'}

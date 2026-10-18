@@ -14,6 +14,7 @@ import sys
 from monitor import LocalStore, ServiceError, Telegram, request_json
 from scraper import atomic_write
 import watch_sources as sources
+import watch_discovery as discovery
 
 ROOT = Path(__file__).resolve().parent
 
@@ -65,7 +66,7 @@ def prepare_state(state, recipient):
     if not isinstance(hints, dict):
         raise ServiceError('Beschädigter Hinweisverlauf.')
     for key, timestamp in hints.items():
-        if not re.fullmatch(r'chrono24:\d+', key) or sources.money(timestamp) <= 0:
+        if not re.fullmatch(r'(?:chrono24|montredo|klocksnack|everywatch):\d+|prisjakt:\d+-\d+', key) or sources.money(timestamp) <= 0:
             raise ServiceError('Beschädigter Hinweisverlauf.')
     return state
 
@@ -115,7 +116,8 @@ def qualifies(row, config):
             and row['total_sek'] <= config['max_total_sek'][row['condition']])
 
 
-SOURCE_LABELS = {'chrono24': 'Chrono24', 'uret': 'Uret', 'ebay': 'eBay', 'corsovinci': 'Corso Vinci'}
+SOURCE_LABELS = {'chrono24': 'Chrono24', 'uret': 'Uret', 'ebay': 'eBay', 'corsovinci': 'Corso Vinci',
+                 'montredo': 'Montredo', 'prisjakt': 'Prisjakt', 'klocksnack': 'Klocksnack', 'everywatch': 'EveryWatch'}
 COUNTRY_LABELS = {'SE': 'Schweden', 'IT': 'Italien', 'DE': 'Deutschland', 'ES': 'Spanien',
                   'FR': 'Frankreich', 'NL': 'Niederlande', 'BE': 'Belgien', 'AT': 'Österreich',
                   'DK': 'Dänemark', 'FI': 'Finnland', 'PL': 'Polen', 'PT': 'Portugal',
@@ -167,10 +169,14 @@ def health_message(report, config):
              f'<b>{matched} ' + ('passendes Angebot' if matched == 1 else 'passende Angebote') + '</b>',
              f'{checked} ' + ('Angebot' if checked == 1 else 'Angebote') + ' mit bestätigtem Schweden-Versand']
     if hints:
-        lines.append(f'{hints} ' + ('ungeprüfter' if hints == 1 else 'ungeprüfte') + ' Chrono24-Suchtreffer · separat')
+        lines.append(f'{hints} ' + ('ungeprüfter Hinweis' if hints == 1 else 'ungeprüfte Hinweise') + ' · separat')
     lines += ['', '<b>Quellen</b>']
     for c in report['coverage']:
-        if c['status'] == 'ok':
+        if c.get('mode') == 'discovery' and c.get('search_readable'):
+            label = f'🔎 {source_label(c["source"])} · {escape(c.get("note", "Nur Hinweise"))}'
+            if c.get('errors'):
+                label += ' · Abruf teilweise fehlgeschlagen'
+        elif c['status'] == 'ok':
             label = f'🟢 {source_label(c["source"])} · {c["checked"]} geprüft'
         elif c['source'] == 'chrono24' and c.get('search_readable'):
             label = f'🟡 Chrono24 · Suchtreffer lesbar, Details eingeschränkt ({c["checked"]}/{c["found"]} geprüft)'
@@ -197,6 +203,20 @@ def health_message(report, config):
 
 
 def hint_message(row):
+    if row.get('source') in discovery.SOURCE_NAMES:
+        source = row['source']
+        if row.get('reference') != sources.REFERENCE or discovery.hint_id(source, row['url']) != row['id']:
+            raise ServiceError('Ungültiger Quellenhinweis.')
+        lines = [f'🔎 <b>{source_label(source)} · ungeprüfter Hinweis</b>', '',
+                 '<b>Hamilton Jazzmaster Performer</b>', '<code>H36215140</code>', '']
+        if row.get('native_currency') in ('SEK', 'EUR', 'USD'):
+            value = amount(row['native_price']).removesuffix(' SEK')
+            lines += [f'<b>{value} {row["native_currency"]}</b> · angezeigter Produktpreis, unbestätigt', '']
+        lines += [escape(row['search_text'][:400]), '', 'Erstmals im Monitor erfasst.', '',
+                  '<i>Verfügbarkeit, Zustand und Endpreis einschließlich Versand nach Schweden bitte prüfen. '
+                  'Kein Budgetcheck; noch kein bestätigtes Kaufangebot.</i>', '',
+                  offer_link(row['url'], 'Fundstelle ansehen')]
+        return '\n'.join(lines)
     from watch_chrono_browser import listing_id
     if row.get('reference') != sources.REFERENCE or row.get('source') != 'chrono24' or listing_id(row['url']) != row['id']:
         raise ServiceError('Ungültiger Chrono24-Hinweis.')
@@ -257,8 +277,12 @@ def notify(report, config, store, telegram, now):
                 store.save(state)
             except ServiceError:
                 print('WARN: Angebotsbilder konnten nicht versendet werden; maximal drei Versuche.')
-    if config.get('chrono24_unverified_hints', False):
+    if config.get('chrono24_unverified_hints', False) or any(s in discovery.SOURCE_NAMES for s in config['sources']):
         for row in report.get('hints', []):
+            if row['source'] == 'chrono24' and not config.get('chrono24_unverified_hints', False):
+                continue
+            if row['source'] in discovery.SOURCE_NAMES and row['source'] not in config['sources']:
+                continue
             if row['id'] in state['unverified_notified'] or row['id'] in state['notified']:
                 continue
             telegram.send(hint_message(row), html=True)
@@ -294,7 +318,7 @@ def write_report(report, directory):
             f'<p>Alarmgrenzen inkl. Versand: neu {report["limits"]["new"]:g} / gebraucht {report["limits"]["used"]:g} SEK.</p>'
             '<p>Alle unten stehenden Angebote haben bestätigten Schwedenversand; auch Angebote über der Alarmgrenze.</p>'
             '<table><tr><th>Quelle</th><th>Zustand</th><th>Uhr SEK</th><th>Versand SEK</th><th>Gesamt SEK</th><th>Lieferbarkeit</th><th>Link</th></tr>'
-            + ''.join(rows) + '</table><h2>Ungeprüfte Chrono24-Hinweise</h2>'
+            + ''.join(rows) + '</table><h2>Ungeprüfte Quellenhinweise</h2>'
             '<p>Keine bestätigten Kaufangebote. Referenzdetails, Zustand, Schweden-Versand und Gesamtpreis unbestätigt; '
             'keine Prüfung gegen die Preisgrenze. Angezeigte Suchpreise können für ein anderes Lieferland gelten.</p>'
             f'<ul>{hints}</ul><h2>Quellenstatus</h2><pre>{status}</pre><h2>Ausgeschlossen</h2><pre>{excluded}</pre></html>')
@@ -311,6 +335,7 @@ def main():
     parser.add_argument('--local-state', type=Path, help='Lokaler statt GitHub-Verlauf')
     parser.add_argument('--chrono-snapshot', type=Path, help='Frischer Bericht des getrennten Chrono24-Browserschritts')
     parser.add_argument('--ebay-snapshot', type=Path, help='Frischer Bericht des getrennten eBay-Browserschritts')
+    parser.add_argument('--discovery-snapshot', type=Path, help='Frischer Bericht für Montredo, Prisjakt, Klocksnack und EveryWatch')
     args = parser.parse_args()
     try:
         if args.test_message:
@@ -321,8 +346,9 @@ def main():
         config = config_from(args.config)
         now = datetime.now(timezone.utc)
         http_config = dict(config)
+        http_config['sources'] = [s for s in config['sources'] if s not in discovery.SOURCE_NAMES]
         if args.chrono_snapshot:
-            http_config['sources'] = [s for s in config['sources'] if s != 'chrono24']
+            http_config['sources'] = [s for s in http_config['sources'] if s != 'chrono24']
         if args.ebay_snapshot:
             http_config['sources'] = [s for s in http_config['sources'] if s != 'ebay']
         offers, coverage, excluded = sources.collect(http_config)
@@ -341,6 +367,12 @@ def main():
             offers.extend(ebay['offers'])
             coverage.append(ebay['coverage'])
             excluded.extend(ebay['excluded'])
+        selected = [s for s in config['sources'] if s in discovery.SOURCE_NAMES]
+        if selected:
+            extra = (discovery.load_snapshot(args.discovery_snapshot, datetime.now(timezone.utc), selected)
+                     if args.discovery_snapshot else discovery.analyze({}, selected))
+            hints.extend(extra['hints'])
+            coverage.extend(extra['coverage'])
         offers.sort(key=lambda row: row['total_sek'])
         coverage.sort(key=lambda row: config['sources'].index(row['source']))
         report = {'checked_at': now.isoformat(), 'limits': config['max_total_sek'], 'offers': offers,

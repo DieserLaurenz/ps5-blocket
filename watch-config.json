@@ -6,6 +6,6 @@
   "minimum_drop_sek": 100,
   "chrono24_unverified_hints": true,
   "detail_limit": 25,
-  "sources": ["chrono24", "uret", "ebay", "corsovinci"],
+  "sources": ["chrono24", "uret", "ebay", "corsovinci", "montredo", "prisjakt", "klocksnack", "everywatch"],
   "price_research_date": "2026-09-14"
 }

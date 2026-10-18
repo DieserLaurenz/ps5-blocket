@@ -6,7 +6,8 @@ if not exist ".watch-venv\Scripts\python.exe" (
   pause
   exit /b 1
 )
-.watch-venv\Scripts\python.exe watch_monitor.py --dry-run
+.watch-venv\Scripts\python.exe watch_discovery.py --http-only --output output\discovery.json
+.watch-venv\Scripts\python.exe watch_monitor.py --dry-run --discovery-snapshot output\discovery.json
 if errorlevel 1 (
   echo Watch check failed. Check output\watch-offers.json for source status.
   pause
