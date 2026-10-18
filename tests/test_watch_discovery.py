@@ -65,6 +65,13 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(report['hints'], [])
         self.assertTrue(all(c['status'] == 'error' for c in report['coverage']))
 
+    def test_initial_http_error_is_never_a_readable_empty_forum(self):
+        snapshot = d.new_snapshot()
+        snapshot['pages']['klocksnack'] = [{'url': d.URLS['klocksnack'], 'error': 'HTTP 403'}]
+        status = d.analyze(snapshot, ['klocksnack'])['coverage'][0]
+        self.assertEqual(status['status'], 'error')
+        self.assertFalse(status['search_readable'])
+
     def test_montredo_euro_price_is_hint_and_sweden_context_required(self):
         row = d.montredo(montredo_html())[0]
         self.assertEqual(row['native_price'], 1070)

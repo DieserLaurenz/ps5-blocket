@@ -255,6 +255,8 @@ def analyze(snapshot, selected=SOURCE_NAMES):
             if any(p.get('error') for p in pages):
                 status['errors'].extend(p['error'] for p in pages if p.get('error'))
             first = pages[0].get('html', '')
+            if not first:
+                raise ValueError('Initial source page unavailable')
             if source == 'montredo':
                 rows = montredo(first)
                 status.update(checked=1, found=1, note='Euro-Shoppreis; Schweden-Endpreis unbestätigt')
