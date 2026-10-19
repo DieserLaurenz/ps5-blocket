@@ -161,7 +161,7 @@ class DiscoveryTests(unittest.TestCase):
         text = monitor.hint_message(row)
         TelegramMarkup(text)
         self.assertIn('1.070 EUR', text)
-        self.assertIn('Kein Budgetcheck', text)
+        self.assertIn('kein Gesamtpreis-Budgetcheck', text)
         self.assertIn('&lt;unsafe&gt;', text)
 
 

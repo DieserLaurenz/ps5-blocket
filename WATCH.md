@@ -39,10 +39,13 @@ older-than-30-minute snapshots cannot produce alerts. The normal 15-minute timer
 includes these sources; no extra service, account or paid subscription is needed.
 
 - **Montredo:** fixed H36215140 product, explicit Swedish shop context, visible EUR
-  price and ordering availability. The site does not supply a confirmed SEK delivered
-  total, so this is a hint, not a budget-qualified offer.
-- **Prisjakt:** the exact-reference product comparison and its in-stock merchant
-  links. Aggregator prices remain unverified until checked at the merchant.
+  price and ordering availability. The current Swedish storefront still bills in EUR,
+  including when `currency=SEK` is requested. The monitor displays an explicitly estimated
+  SEK product price using the ECB reference rate, with original EUR price and rate date.
+  This is not a verified delivered total or a budget-qualified offer.
+- **Prisjakt:** the exact-reference product comparison, in-stock merchant links,
+  merchant names and actual SEK product prices. These also appear in the daily status
+  summary. Shipping and checkout totals remain separate and unconfirmed.
 - **Klocksnack:** first three recent sale-forum pages, up to five Hamilton candidate
   threads per run. Exact H36215140 must appear in the first post. Wanted, closed,
   sold and accessory categories are excluded. This does not search the whole archive;
@@ -51,14 +54,25 @@ includes these sources; no extra service, account or paid subscription is needed
   Locked premium cards and hidden application data are not read. Four of eight
   active listings were publicly readable in the local live check. Counts change.
 
-Each new discovery ID gets one clearly labelled Telegram hint, even if its displayed
-price is above the budget. Native EUR/USD prices are never treated as SEK, no Sweden
-shipping is invented, and no budget qualification occurs. These discovery hints are
-deduplicated separately from verified offers and existing Chrono24 hints; adding the
-sources preserves history. They currently notify on **new IDs**, not price changes.
+Each new discovery ID gets one clearly labelled Telegram price notice, even if its
+product price is above the budget. EUR/USD prices are converted using the official
+ECB daily XML feed; estimates say **ca.** and retain their original amount and rate date.
+SEK prices from Prisjakt are used directly. No Sweden shipping is invented and no
+delivered-price budget qualification occurs. ECB data is cached for six hours, checked
+for a valid rate date (at most seven calendar days old, allowing weekends/holidays),
+and revalidated before using the cache after a network failure. If no usable rate is
+available, the original price remains visible and a conversion error is reported.
+
+Montredo, Prisjakt and publicly readable EveryWatch listings now also alert on a new
+lowest product price at least **100 SEK lower** than the previous notified low. The
+comparison uses original-currency prices, valued at the current ECB rate, so FX-only
+movements do not trigger price-drop alerts. Existing IDs are silently seeded as the
+baseline on upgrade; the next status summary shows the new SEK presentation once.
+History and the recipient remain intact. Klocksnack remains a new-ID hint source
+because its free-text prices are not reliably parsed.
 Cross-platform duplicates (for example Corso Vinci on EveryWatch) are not merged.
 Reports mark these sources as partial discovery coverage even when fetching succeeds.
-Only verified offers continue using the existing 100 SEK price-drop notifications.
+Verified offers retain their separate delivered-total price history and budget rules.
 
 Live VPS checks on 18 October: **Uret and Corso Vinci verified successfully**.
 Chrono24's browser access was intermittent overnight. The new curl_cffi capture

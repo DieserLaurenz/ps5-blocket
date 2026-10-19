@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import json
 import os
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
+from xml.etree import ElementTree
 
 from ifk_monitor import Document
 from monitor import ServiceError
@@ -22,6 +23,67 @@ URLS = {
 }
 SOURCE_NAMES = tuple(URLS)
 MAX_BYTES = 20_000_000
+FX_URL = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml'
+PRICED_SOURCES = ('montredo', 'prisjakt', 'everywatch')
+
+
+def exchange_rates(xml, today):
+    """ECB reference rates, never a promise of the card issuer's conversion rate."""
+    if not isinstance(xml, str) or len(xml) > 64000 or '<!DOCTYPE' in xml.upper():
+        raise ValueError('Invalid exchange-rate document')
+    root = ElementTree.fromstring(xml)
+    dated = [n for n in root.iter() if n.tag.endswith('}Cube') and 'time' in n.attrib]
+    if len(dated) != 1:
+        raise ValueError('Exchange-rate date missing')
+    day = date.fromisoformat(dated[0].attrib['time'])
+    if not 0 <= (today - day).days <= 7:
+        raise ValueError('Stale or future exchange rate')
+    rates = {}
+    for n in dated[0]:
+        currency = n.attrib.get('currency')
+        if currency in ('SEK', 'USD'):
+            if currency in rates:
+                raise ValueError('Duplicate exchange rate')
+            rates[currency] = float(n.attrib['rate'])
+    if not 5 < rates.get('SEK', 0) < 20 or not .4 < rates.get('USD', 0) < 2:
+        raise ValueError('Implausible exchange rate')
+    return {'date': day.isoformat(), 'EUR': rates['SEK'], 'USD': rates['SEK'] / rates['USD'], 'SEK': 1.0}
+
+
+def capture_rates(output, client_factory=sources.Client):
+    cache = output.with_name('ecb-rates.json')
+    now = datetime.now(timezone.utc)
+    old = None
+    try:
+        if cache.stat().st_size <= 65000:
+            old = json.loads(cache.read_text(encoding='utf-8'))
+            exchange_rates(old['xml'], now.date())
+            age = (now - datetime.fromisoformat(old['fetched_at'])).total_seconds()
+            if 0 <= age <= 21600:
+                return old
+    except (OSError, ValueError, KeyError, TypeError, ElementTree.ParseError):
+        old = None
+    client = client_factory()
+    try:
+        xml = client.get(FX_URL)
+        exchange_rates(xml, now.date())
+        data = {'url': FX_URL, 'fetched_at': now.isoformat(), 'xml': xml}
+        atomic_write(cache, json.dumps(data))
+        return data
+    except (ServiceError, ValueError, KeyError, TypeError, ElementTree.ParseError):
+        return old or {'error': 'SEK-Umrechnung derzeit nicht verfügbar'}
+    finally:
+        client.close()
+
+
+def add_prices(rows, rates):
+    for row in rows:
+        currency, price = row.get('native_currency'), row.get('native_price')
+        if currency == 'SEK':
+            row.update(price_sek=price, conversion_rate=1.0, price_estimated=False)
+        elif currency in ('EUR', 'USD') and rates:
+            row.update(price_sek=sources.money(price * rates[currency]), conversion_rate=rates[currency],
+                       price_estimated=True, fx_date=rates['date'], fx_source=FX_URL)
 
 
 def hint_id(source, url):
@@ -82,7 +144,7 @@ def montredo(html):
         raise ValueError('Montredo price conflict')
     return [hint('montredo', URLS['montredo'],
                  'Hamilton H36215140 · Montredo · Shop-Lieferland Schweden. '
-                 'Euro-Produktpreis; Versandkosten und Checkout-Endpreis offen.', price, 'EUR')]
+                 'Versandkosten und Checkout-Endpreis offen.', price, 'EUR')]
 
 
 def prisjakt(html):
@@ -95,11 +157,12 @@ def prisjakt(html):
             continue
         if not re.search(r'\bI lager\b', a.text()):
             continue
-        seller = next((n.attrs.get('alt', '') for n in a.find(tag='img')), '')
+        seller = next((n.attrs.get('alt', '') for n in a.find(tag='img')), '')[:80]
         price = re.search(r'(?<![\w.,])\d[\d\s\xa0\u202f]*(?:[,.]\d{1,2})?\s*(?:SEK|kr)\b', a.text())
         if not price:
             raise ValueError('Prisjakt merchant price missing')
         row = hint('prisjakt', a.attrs['href'], f'{seller} · {a.text()}', sources.sek(price[0]), 'SEK')
+        row['seller'] = seller or 'Händler'
         rows[row['id']] = row
     if not rows and not re.search(r'Inga (?:butiker|priser)|0 butiker', doc.text(), re.I):
         raise ValueError('Prisjakt offer list missing')
@@ -183,6 +246,7 @@ def new_snapshot():
 
 def capture(output, browser_fallback=True):
     snapshot = new_snapshot()
+    snapshot['fx'] = capture_rates(output)
     def save():
         atomic_write(output, json.dumps(snapshot, ensure_ascii=True))
     for source, url in URLS.items():
@@ -244,6 +308,10 @@ def capture(output, browser_fallback=True):
 
 def analyze(snapshot, selected=SOURCE_NAMES):
     result = {'hints': [], 'coverage': []}
+    try:
+        rates = exchange_rates(snapshot['fx']['xml'], datetime.fromisoformat(snapshot['checked_at']).date())
+    except (ValueError, KeyError, TypeError, ElementTree.ParseError):
+        rates = None
     for source in selected:
         status = {'source': source, 'status': 'partial', 'checked': 0, 'found': 0,
                   'mode': 'discovery', 'search_readable': False, 'errors': [], 'note': ''}
@@ -259,10 +327,10 @@ def analyze(snapshot, selected=SOURCE_NAMES):
                 raise ValueError('Initial source page unavailable')
             if source == 'montredo':
                 rows = montredo(first)
-                status.update(checked=1, found=1, note='Euro-Shoppreis; Schweden-Endpreis unbestätigt')
+                status.update(checked=1, found=1, note='Produktpreis in SEK umgerechnet; Versand separat')
             elif source == 'prisjakt':
                 rows = prisjakt(first)
-                status.update(checked=len(rows), found=len(rows), note='Händlerhinweise; Preise noch nicht beim Händler verifiziert')
+                status.update(checked=len(rows), found=len(rows), note='Händlerpreise in SEK laut Prisjakt; Versand separat')
             elif source == 'everywatch':
                 rows, found = everywatch(first)
                 status.update(checked=len(rows), found=found, note='Nur öffentlich sichtbare Angebote; Premium-Treffer ausgeschlossen')
@@ -289,6 +357,11 @@ def analyze(snapshot, selected=SOURCE_NAMES):
                 if status['found'] > status['checked']:
                     status['errors'].append('Nicht alle passenden Forumsbeiträge geprüft')
             status['search_readable'] = True
+            add_prices(rows, rates)
+            if any(r.get('native_currency') in ('EUR', 'USD') and 'price_sek' not in r for r in rows):
+                status['errors'].append('SEK-Umrechnung derzeit nicht verfügbar; Originalpreis bleibt erhalten')
+                if source == 'montredo':
+                    status['note'] = 'SEK-Umrechnung nicht verfügbar; Originalpreis in EUR'
         except (ServiceError, ValueError, KeyError, TypeError, AttributeError):
             status['status'] = 'error'
             status['errors'].append('Keine verifizierbare öffentliche Ergebnisliste')

@@ -43,7 +43,7 @@ def config_from(path):
 
 
 def empty_state():
-    return {'version': 1, 'reference': sources.REFERENCE, 'recipient': None, 'notified': {}}
+    return {'version': 1, 'reference': sources.REFERENCE, 'recipient': None, 'notified': {}, 'discovery_prices': {}}
 
 
 def prepare_state(state, recipient):
@@ -68,6 +68,14 @@ def prepare_state(state, recipient):
     for key, timestamp in hints.items():
         if not re.fullmatch(r'(?:chrono24|montredo|klocksnack|everywatch):\d+|prisjakt:\d+-\d+', key) or sources.money(timestamp) <= 0:
             raise ServiceError('Beschädigter Hinweisverlauf.')
+    prices = state.setdefault('discovery_prices', {})
+    if not isinstance(prices, dict):
+        raise ServiceError('Beschädigter Quellenpreisverlauf.')
+    for key, row in prices.items():
+        if (not re.fullmatch(r'(?:montredo|everywatch):\d+|prisjakt:\d+-\d+', key)
+                or not isinstance(row, dict) or row.get('currency') not in ('EUR', 'USD', 'SEK')
+                or sources.money(row.get('lowest_native')) <= 0):
+            raise ServiceError('Beschädigter Quellenpreisverlauf.')
     return state
 
 
@@ -138,6 +146,14 @@ def offer_link(url, label):
     return f'<a href="{escape(url, quote=True)}">{escape(label)} ↗</a>'
 
 
+def discovery_price(row):
+    if row.get('price_sek') is not None:
+        return ('ca. ' if row.get('price_estimated') else '') + amount(row['price_sek'])
+    if row.get('native_currency') in ('EUR', 'USD', 'SEK'):
+        return amount(row['native_price']).removesuffix(' SEK') + ' ' + row['native_currency']
+    return 'Preis nicht erfasst'
+
+
 def message(row, config, old=None):
     label = '⌚ Neues Angebot' if old is None else '📉 Neuer Tiefstpreis im Monitor'
     condition = 'Neu / ungetragen' if row['condition'] == 'new' else 'Gebraucht'
@@ -199,22 +215,42 @@ def health_message(report, config):
     lines += ['', '<b>Deine Preisgrenzen</b> · inkl. Versand',
               f'Gebraucht {amount(config["max_total_sek"]["used"])} · Neu {amount(config["max_total_sek"]["new"])}', '',
               '<i>Suchtreffer sind keine bestätigten Kaufangebote. Keine vollständige Marktabdeckung.</i>']
+    priced = [r for r in report.get('hints', []) if r['source'] in ('montredo', 'prisjakt') and r.get('native_price')]
+    if priced:
+        lines += ['', '<b>Weitere Produktpreise · Versand separat</b>']
+        for row in sorted(priced, key=lambda r: r.get('price_sek', float('inf')))[:5]:
+            label = SOURCE_LABELS[row['source']]
+            if row.get('seller'):
+                label += ' / ' + row['seller']
+            lines.append(f'{offer_link(row["url"], label)}: <b>{escape(discovery_price(row))}</b>')
+        if len(priced) > 5:
+            lines.append(f'{len(priced) - 5} weitere Preise im Bericht.')
+        if any(r.get('price_estimated') for r in priced):
+            lines.append('<i>ca. = EZB-Umrechnung; Shop-Abrechnung und Kartenkurs können abweichen.</i>')
     return '\n'.join(lines)
 
 
-def hint_message(row):
+def hint_message(row, old_native=None):
     if row.get('source') in discovery.SOURCE_NAMES:
         source = row['source']
         if row.get('reference') != sources.REFERENCE or discovery.hint_id(source, row['url']) != row['id']:
             raise ServiceError('Ungültiger Quellenhinweis.')
-        lines = [f'🔎 <b>{source_label(source)} · ungeprüfter Hinweis</b>', '',
+        heading = '📉 Preissenkung' if old_native is not None else 'Preisbeobachtung' if row.get('native_price') else 'ungeprüfter Hinweis'
+        lines = [f'🔎 <b>{source_label(source)} · {heading}</b>', '',
                  '<b>Hamilton Jazzmaster Performer</b>', '<code>H36215140</code>', '']
         if row.get('native_currency') in ('SEK', 'EUR', 'USD'):
-            value = amount(row['native_price']).removesuffix(' SEK')
-            lines += [f'<b>{value} {row["native_currency"]}</b> · angezeigter Produktpreis, unbestätigt', '']
-        lines += [escape(row['search_text'][:400]), '', 'Erstmals im Monitor erfasst.', '',
-                  '<i>Verfügbarkeit, Zustand und Endpreis einschließlich Versand nach Schweden bitte prüfen. '
-                  'Kein Budgetcheck; noch kein bestätigtes Kaufangebot.</i>', '',
+            lines += [f'<b>{escape(discovery_price(row))}</b> · Produktpreis, Versand separat']
+            if row.get('price_estimated'):
+                value = amount(row['native_price']).removesuffix(' SEK')
+                lines.append(f'Shop-/Quellpreis: {value} {row["native_currency"]} · EZB-Kurs vom {escape(row["fx_date"])}')
+            if old_native is not None:
+                old_text = amount(old_native).removesuffix(' SEK') + ' ' + row['native_currency']
+                drop = (old_native - row['native_price']) * row['conversion_rate']
+                lines.append(f'Vorher gemeldet: {old_text} · Senkung {amount(drop)}' + (' zum aktuellen Referenzkurs' if row.get('price_estimated') else ''))
+            lines.append('')
+        detail = f'Händler: {row["seller"]} · Preis laut Prisjakt' if source == 'prisjakt' and row.get('seller') else row['search_text'][:400]
+        lines += [escape(detail), '',
+                  '<i>Versandkosten und Checkout-Endpreis nach Schweden noch offen; kein Gesamtpreis-Budgetcheck.</i>', '',
                   offer_link(row['url'], 'Fundstelle ansehen')]
         return '\n'.join(lines)
     from watch_chrono_browser import listing_id
@@ -283,14 +319,27 @@ def notify(report, config, store, telegram, now):
                 continue
             if row['source'] in discovery.SOURCE_NAMES and row['source'] not in config['sources']:
                 continue
-            if row['id'] in state['unverified_notified'] or row['id'] in state['notified']:
+            if row['id'] in state['notified']:
                 continue
-            telegram.send(hint_message(row), html=True)
+            known = row['id'] in state['unverified_notified']
+            track = row['source'] in discovery.PRICED_SOURCES and row.get('price_sek') is not None
+            prior = state['discovery_prices'].get(row['id']) if track else None
+            old = prior['lowest_native'] if prior and prior['currency'] == row['native_currency'] else None
+            drop = (old - row['native_price']) * row['conversion_rate'] if old is not None else 0
+            if known and drop + 1e-8 < config['minimum_drop_sek']:
+                if track and old is None:
+                    # Seed existing listings without replaying yesterday's alerts.
+                    state['discovery_prices'][row['id']] = {'lowest_native': row['native_price'], 'currency': row['native_currency']}
+                    store.save(state)
+                continue
+            telegram.send(hint_message(row, old_native=old), html=True)
             state['unverified_notified'][row['id']] = now
+            if track:
+                state['discovery_prices'][row['id']] = {'lowest_native': row['native_price'], 'currency': row['native_currency']}
             store.save(state)
             sent += 1
     health_key = [(c['source'], c['status']) for c in report['coverage']]
-    health_key = json.dumps(health_key)
+    health_key = json.dumps({'presentation': 2, 'sources': health_key})
     if now - state.get('health_at', 0) >= 86400 or health_key != state.get('health_key'):
         telegram.send(health_message(report, config), html=True)
         state.update(health_at=now, health_key=health_key)
@@ -308,7 +357,7 @@ def write_report(report, directory):
                     + f'<td><a href="{escape(row["url"], quote=True)}">Angebot</a> {escape(row.get("total_note", ""))}</td></tr>')
     status = escape(json.dumps(report['coverage'], indent=2, ensure_ascii=False))
     excluded = escape(json.dumps(report['excluded'], indent=2, ensure_ascii=False))
-    hints = ''.join(f'<li>{escape(row["search_text"])} — '
+    hints = ''.join(f'<li><b>{source_label(row["source"])}: {escape(discovery_price(row))}</b> — {escape(row["search_text"])} — '
                     f'<a href="{escape(row["url"], quote=True)}">Inserat selbst prüfen</a></li>'
                     for row in report.get('hints', []))
     html = ('<!doctype html><html lang="de"><meta charset="utf-8"><title>Hamilton H36215140</title>'
